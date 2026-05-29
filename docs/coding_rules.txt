@@ -1,0 +1,114 @@
+📜 Project SpiderWeb: Coding Standards & Best Practices
+
+To ensure Project SpiderWeb remains fast, maintainable, and scalable as we build out the Meta-Browser and the drag-and-drop editor, all code must adhere to the following principles.
+
+1. Core Architectural Philosophies
+
+1.1. Single Responsibility Principle (One Purpose Per File)
+
+Every file should do exactly one thing.
+
+A component file (TextNode.jsx) should only contain the UI rendering logic for that specific node.
+
+Data fetching or complex state mutations should be extracted into custom hooks (e.g., useUpdateElement.js).
+
+Utility functions (e.g., calculating scale factors or collision detection) should live in pure JavaScript files in the /utils folder.
+
+1.2. DRY (Don't Repeat Yourself)
+
+If you find yourself copying and pasting UI configurations (like a specific button style) or logic (like Firebase error handling), abstract it.
+
+UI Abstractions: Use reusable Tailwind component wrappers (e.g., <ToolbarButton>) instead of repeating long Tailwind class strings.
+
+Logic Abstractions: Use custom hooks for repeated logic across different editor tools.
+
+2. React Component Rules
+
+2.1. Pure Functional Components
+
+All components must be functional components using Hooks. Do not use class components. Components should be as pure as possible: given the same props, they should render the same output.
+
+2.2. Keep Components Small & Flat
+
+If a component exceeds 150-200 lines of code, it is likely doing too much. Break it down into sub-components.
+
+Example: The PropertyPanel should be broken down into <ColorPicker />, <TypographySettings />, and <LinkInput />.
+
+2.3. Early Returns for Conditional Rendering
+
+Avoid deep nesting of ternary operators or logical ANDs (&&). Use early returns to handle loading states, errors, or empty states at the top of the component.
+
+// ❌ Bad
+const ElementNode = ({ data }) => {
+  return data ? <div>{data.content}</div> : null;
+};
+
+// ✅ Good
+const ElementNode = ({ data }) => {
+  if (!data) return null;
+  return <div>{data.content}</div>;
+};
+
+
+3. Performance Strictness (The Canvas Mandate)
+
+Because the core of this app is a Figma-like editor, performance is our highest priority. Moving the mouse should not cause frame drops.
+
+3.1. Strict Memoization of Canvas Elements
+
+Every element rendered on the canvas (Text, Image, Shape) must be wrapped in React.memo. When a user drags elem_1, we absolutely cannot allow elem_2 through elem_100 to re-render.
+
+export const TextNode = React.memo(({ x, y, content }) => {
+  // component logic
+});
+
+
+3.2. Colocate Ephemeral State
+
+Do not put rapid-fire state updates (like the X/Y coordinates of a mouse during a drag event) into the global Zustand store or Firebase.
+
+While Dragging: Update local component state (or let react-rnd handle it internally).
+
+On Drag Stop: Dispatch the final X/Y coordinates to the global store/Firebase.
+
+3.3. Use useCallback for Canvas Event Handlers
+
+Functions passed down to canvas elements as props (e.g., onElementSelect, onElementUpdate) must be wrapped in useCallback. Otherwise, React will recreate these functions on every parent render, breaking the React.memo optimization of the child elements.
+
+4. State Management Guidelines
+
+We will split state into three distinct tiers:
+
+Global/App State (Zustand): * Meta-Browser tabs, current active tab, authentication state, and the active pageId being viewed/edited.
+
+Persistent Document State (Firebase):
+
+The actual JSON blueprint of the page. Changes here should be debounced if they are frequent.
+
+Local/UI State (React useState):
+
+Which specific element is currently selected in the editor, drag coordinates, dropdown toggle states, and form inputs.
+
+5. Security & Data Integrity
+
+5.1. Total Sanitization
+
+Because users define the content of the "internet," we must assume all text input is potentially malicious.
+
+NEVER use dangerouslySetInnerHTML.
+
+All text content must be rendered as standard string children: <p>{element.content}</p>.
+
+5.2. Schema Validation
+
+Before saving a page blueprint to Firestore, the JSON object must be validated (using a utility function or a library like Zod) to ensure no unexpected fields or script tags have been injected into the payload by a malicious client.
+
+6. Naming Conventions
+
+Components: PascalCase (e.g., PageRenderer.jsx, MetaBrowser.jsx).
+
+Hooks: camelCase, prefixed with use (e.g., useCanvasDrag.js).
+
+Utility Functions: camelCase (e.g., calculateScaleFactor.js).
+
+Constants: UPPER_SNAKE_CASE for global constants (e.g., MAX_CANVAS_WIDTH = 1200).

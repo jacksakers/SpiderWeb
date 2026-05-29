@@ -1,0 +1,159 @@
+🌐 Project SpiderWeb: Design Document
+
+1. Executive Summary
+
+Project SpiderWeb is a reimagined, miniaturized internet where every user's profile is a bespoke, interactive canvas. It brings back the wild, creative nostalgia of the early internet (Myspace/Geocities) but replaces the steep learning curve of HTML/CSS with a fluid, zero-code, drag-and-drop editor.
+
+Pages are essentially "interactive PDFs" built on a fixed-coordinate plane. Users navigate the network not through search engines initially, but through a custom "Meta-Browser"—a browser-within-a-browser—that allows them to visit IDs, open tabs, and click user-placed hyperlinks to traverse the ecosystem.
+
+2. Tech Stack
+
+Frontend Framework: React 18+ (via Vite for lightning-fast HMR and building).
+
+Styling: Tailwind CSS (for the UI shell, meta-browser, and editor toolbars).
+
+Backend & Database: Firebase (Firestore for JSON blueprints, Firebase Storage for user images/GIFs, Firebase Auth for accounts).
+
+Canvas Interactions: react-rnd (React Resizable and Draggable) - Highly recommended for handling the absolute positioning, dragging, and resizing of bounding boxes without needing a heavy HTML5 Canvas engine.
+
+State Management: Zustand or React Context for managing Meta-Browser tabs and global auth state. Local state for editor interactions.
+
+3. The JSON Blueprint (Data Schema)
+
+Instead of storing HTML, we store a structured JSON blueprint. This makes malicious script injection impossible and allows our React renderer to paint the page flawlessly.
+
+Firestore Collection: pages/{pageId}
+
+{
+  "ownerId": "user123",
+  "title": "My Retro Space",
+  "theme": {
+    "backgroundColor": "#1a1a1a",
+    "backgroundImage": "url(sparkles.gif)",
+    "width": 1200,
+    "height": 2000
+  },
+  "elements": {
+    "elem_1": {
+      "type": "text",
+      "x": 50,
+      "y": 100,
+      "width": 300,
+      "height": "auto",
+      "content": "Welcome to my corner of the web!",
+      "style": { "color": "#ff00ff", "fontSize": "24px", "fontFamily": "Comic Sans MS" }
+    },
+    "elem_2": {
+      "type": "image",
+      "x": 400,
+      "y": 100,
+      "width": 250,
+      "height": 250,
+      "src": "[https://firebase.storage/.../cat.gif](https://firebase.storage/.../cat.gif)",
+      "href": "pageId_of_friend" 
+    }
+  }
+}
+
+
+Note: Using a dictionary (elements: {}) instead of an array makes updating/deleting specific elements by ID an $O(1)$ operation in React and Firestore.
+
+4. Core Systems Architecture
+
+A. The Meta-Browser Engine
+
+The outer shell of the application. It acts as an operating system window manager.
+
+Tab System: Maintains an array of active tabs in state. Each tab tracks its current URL (Page ID) and history stack (for back/forward buttons).
+
+Address Bar: Allows users to manually type a Page ID to load a new JSON blueprint.
+
+Link Interception: When an href on a canvas element is clicked, standard browser navigation is blocked (e.preventDefault()). Instead, the Meta-Browser updates the currentUrl state of the active tab.
+
+B. The Figma-like Editor Engine
+
+The editor must feel completely intuitive.
+
+Interactive Layer: We map over the JSON elements and wrap them in <Rnd> (react-rnd) components. This instantly provides drag handles and resize bounding boxes.
+
+Property Panel: Clicking an element highlights it and opens a floating context menu or sidebar panel to edit text, change colors, or add hyperlink URLs.
+
+Asset Dropping: Using HTML5 onDrop events on the canvas, users can drag images directly from their desktop. The app intercepts the file, uploads it to Firebase Storage, gets the URL, and instantly appends a new image element to the JSON blueprint at the exact mouse coordinates of the drop.
+
+C. The Mobile Zoom Renderer
+
+Responsive CSS breaks the "interactive PDF" illusion. To fix this on mobile, the canvas remains locked at desktop width (e.g., 1200px).
+
+The parent wrapper measures the physical device width.
+
+Calculates: scale = deviceWidth / 1200.
+
+Applies: transform: scale(scale); transform-origin: top left;.
+
+Result: The user sees a perfect, zoomed-out version of the desktop site.
+
+5. Implementation Phases
+
+Phase 1: The Core Editor & Renderer (Single Player)
+
+Setup Vite, React, and Tailwind.
+
+Build the Renderer component that takes hardcoded JSON and draws the absolute-positioned page.
+
+Build the Editor component wrapping elements in react-rnd.
+
+Implement state updates (dragging an element updates its x/y in the JSON).
+
+Add basic toolbars: Add Text, Add Image, Add Shape.
+
+Phase 2: Firebase Integration & Meta-Browser
+
+Connect Firebase Auth (Anonymous or Google Sign-In).
+
+Implement saving and loading blueprints to/from Firestore.
+
+Build the Meta-Browser UI (Tabs, Address Bar, Back/Forward).
+
+Implement the routing system (clicking a button on Page A loads Page B in the Meta-Browser).
+
+Phase 3: Polish & "Figma" Feel
+
+Implement Desktop drag-and-drop file uploads to Firebase Storage.
+
+Add Z-index ordering (Bring to Front, Send to Back).
+
+Implement bounding-box selections (drag a square to select multiple elements).
+
+Keyboard shortcuts (Delete, Ctrl+C, Ctrl+V, Ctrl+Z history stack).
+
+6. React Best Practices & Code Structure
+
+Directory Structure
+
+src/
+ ├── components/
+ │    ├── browser/       # Meta-browser UI (Tabs, Address Bar)
+ │    ├── editor/        # Editing tools (Property panels, color pickers)
+ │    └── elements/      # Canvas elements (TextNode, ImageNode, ShapeNode)
+ ├── store/              # Zustand/Context stores (tabStore.js, canvasStore.js)
+ ├── utils/              # Firebase config, drag-drop math helpers
+ └── App.jsx             # Main Window Manager
+
+
+Performance & Rules
+
+Strict Memoization: In the editor, moving one element should not re-render the other 50 elements. Wrap each canvas element in React.memo().
+
+Separate UI State from Canvas State: The position of the mouse cursor during a drag should be kept in local component state (or via react-rnd's internal state). Only dispatch the final x/y to the global JSON store onDragStop to prevent Firebase/React overload.
+
+Z-Index Management: Store a zIndex integer on every element. Provide buttons to increment/decrement this value so users can layer GIFs over text.
+
+7. Development Gotchas & Tips
+
+Security: By strictly mapping the JSON to standard React components (<p>, <img>, <a>), you inherently sanitize the input. Never use dangerouslySetInnerHTML.
+
+The Iframe Trap: You might be tempted to use actual <iframe> tags to load pages. Don't. Render the JSON directly into your Meta-Browser React state. Iframes are slow, hard to communicate with, and block drag-and-drop APIs.
+
+Fonts: Pre-load a set of 10-15 nostalgic/clean web-safe fonts (Comic Sans, Courier New, Times New Roman, Impact, plus some modern Google Fonts). Do not allow users to upload custom font files initially (malware risk).
+
+Cursor States: To make it feel like Figma, heavily utilize CSS cursor changes (cursor-move, cursor-nwse-resize, cursor-pointer). Visual feedback is everything in a zero-code editor.
