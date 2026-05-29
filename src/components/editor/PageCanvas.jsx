@@ -68,7 +68,8 @@ function PageCanvas() {
 
   return (
     // Outer wrapper measures physical width for scale calculation
-    <div ref={containerRef} className="w-full overflow-hidden">
+    <div ref={containerRef} className="w-full overflow-x-hidden"
+         style={{ minHeight: page.theme.height * scale }}>
       {/* Scaled canvas */}
       <div
         style={{
@@ -82,8 +83,9 @@ function PageCanvas() {
           position: 'relative',
           transformOrigin: 'top left',
           transform: `scale(${scale})`,
-          // Shrink wrapper height to match scaled canvas so page layout isn't broken
-          marginBottom: `${page.theme.height * scale - page.theme.height}px`,
+          // Collapse the extra layout space created by the scaled-down canvas
+          // so the scrollable parent knows the true rendered height.
+          marginBottom: `${(page.theme.height * scale) - page.theme.height}px`,
           outline: isDragOver && isEditing ? '3px dashed #aa3bff' : 'none',
         }}
         onClick={clearSelection}
@@ -92,9 +94,9 @@ function PageCanvas() {
         onDrop={handleDrop}
       >
         {elementEntries.map(([id, data]) => {
-          if (data.type === 'text') return <TextNode key={id} id={id} data={data} />;
-          if (data.type === 'image') return <ImageNode key={id} id={id} data={data} />;
-          if (data.type === 'shape') return <ShapeNode key={id} id={id} data={data} />;
+          if (data.type === 'text') return <TextNode key={id} id={id} data={data} scale={scale} />;
+          if (data.type === 'image') return <ImageNode key={id} id={id} data={data} scale={scale} />;
+          if (data.type === 'shape') return <ShapeNode key={id} id={id} data={data} scale={scale} />;
           return null;
         })}
 

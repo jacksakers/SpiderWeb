@@ -11,7 +11,7 @@ import { useTabStore } from '../../store/tabStore';
  * - Double-click to enter inline text editing
  * - All text rendered as plain string children (never innerHTML) per security rules
  */
-const TextNode = React.memo(function TextNode({ id, data }) {
+const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
   const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
   const navigateTo = useTabStore((s) => s.navigateTo);
   const isSelected = selectedElementId === id;
@@ -126,6 +126,7 @@ const TextNode = React.memo(function TextNode({ id, data }) {
       onDragStop={handleDragStop}
       onResizeStop={handleResizeStop}
       style={{ zIndex: data.zIndex ?? 1 }}
+      scale={scale}
       bounds="parent"
       disableDragging={textEditing}
     >

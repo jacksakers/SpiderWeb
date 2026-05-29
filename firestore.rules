@@ -48,6 +48,27 @@ service cloud.firestore {
 
       // Only the owner can delete their page
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      // ── Likes subcollection ─────────────────────────────────────────────
+      match /likes/{userId} {
+        allow read: if true;
+        // Users can only write/delete their own like document
+        allow write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // ── Comments subcollection ──────────────────────────────────────────
+      match /comments/{commentId} {
+        allow read: if true;
+        // Any signed-in user can post a comment (must set themselves as author)
+        allow create: if isSignedIn()
+          && request.resource.data.authorId == request.auth.uid;
+        // Comment author OR page owner can delete
+        allow delete: if isSignedIn()
+          && (
+            request.auth.uid == resource.data.authorId
+            || request.auth.uid == get(/databases/$(database)/documents/pages/$(pageId)).data.ownerId
+          );
+      }
     }
 
     // ─── User profiles ───────────────────────────────────────────────────────

@@ -7,19 +7,19 @@ import ToolbarButton from './ToolbarButton';
 import CollaboratorsModal from './CollaboratorsModal';
 
 /**
- * EditorToolbar — adds elements, toggles edit mode, shows save status, and
- * opens the collaborators/share modal.
- *
- * Edit mode is gated: button only appears if the current user has permission.
+ * EditorToolbar — adds elements, toggles edit mode, shows save status,
+ * lets the owner rename the page title, and opens the collaborators modal.
  */
 function EditorToolbar() {
-  const { isEditing, setEditing, addElement, canUserEdit, page, isSaving } = useCanvasStore();
+  const { isEditing, setEditing, addElement, canUserEdit, page, isSaving, updatePageTitle } = useCanvasStore();
   const { user } = useAuthStore();
   const fileInputRef = useRef(null);
   const [showShare, setShowShare] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
 
-  const canEdit    = canUserEdit(user?.uid ?? null);
-  const isOwner    = user?.uid && user.uid === page.ownerId;
+  const canEdit = canUserEdit(user?.uid ?? null);
+  const isOwner = user?.uid && user.uid === page.ownerId;
 
   function handleAddText()  { addElement(createTextElement({ x: 80, y: 80 })); }
   function handleAddShape(shape) { addElement(createShapeElement({ x: 100, y: 100, shape })); }
@@ -37,13 +37,50 @@ function EditorToolbar() {
     setEditing(!isEditing);
   }
 
+  function startTitleEdit() {
+    setTitleDraft(page.title ?? '');
+    setEditingTitle(true);
+  }
+
+  function commitTitleEdit() {
+    setEditingTitle(false);
+    updatePageTitle(titleDraft);
+  }
+
+  function handleTitleKeyDown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commitTitleEdit(); }
+    if (e.key === 'Escape') { setEditingTitle(false); }
+  }
+
   return (
     <div className="flex items-center gap-2 flex-wrap px-3 py-2 bg-black/60 border-b border-white/10 backdrop-blur min-h-[44px]">
 
-      {/* Page title */}
-      <span className="text-white/60 text-xs font-mono truncate max-w-[160px] hidden sm:block">
-        sw://{page.pageId}
-      </span>
+      {/* Page title — editable for owners in edit mode */}
+      {isEditing && isOwner ? (
+        editingTitle ? (
+          <input
+            autoFocus
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitleEdit}
+            onKeyDown={handleTitleKeyDown}
+            maxLength={128}
+            className="text-white text-xs font-mono bg-white/10 rounded px-2 py-0.5 outline-none focus:ring-1 focus:ring-purple-500 max-w-[200px] hidden sm:block"
+          />
+        ) : (
+          <button
+            onClick={startTitleEdit}
+            title="Rename page"
+            className="text-white/60 text-xs font-mono truncate max-w-[200px] hidden sm:block hover:text-white hover:underline"
+          >
+            {page.title || 'Untitled Page'}
+          </button>
+        )
+      ) : (
+        <span className="text-white/60 text-xs font-mono truncate max-w-[160px] hidden sm:block">
+          {page.title || page.pageId}
+        </span>
+      )}
 
       {canEdit && (
         <>

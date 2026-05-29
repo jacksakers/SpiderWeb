@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { isFirebaseConfigured, db } from '../utils/firebase';
 import { validateBlueprint } from '../utils/blueprintSchema';
 import { useHistoryStore } from '../store/historyStore';
@@ -115,10 +115,11 @@ export const useCanvasStore = create((set, get) => ({
 
     set({ isSaving: true });
     try {
-      await setDoc(
+      // Use updateDoc (not setDoc+merge) so that deleted element keys are
+      // fully removed from Firestore instead of being preserved by a deep merge.
+      await updateDoc(
         doc(db, 'pages', pageId),
         { ...firestoreData, updatedAt: serverTimestamp() },
-        { merge: true }
       );
     } catch (err) {
       console.error('savePage error', err);
@@ -206,6 +207,12 @@ export const useCanvasStore = create((set, get) => ({
 
   updatePageMeta(patch) {
     set((state) => ({ page: { ...state.page, ...patch } }));
+  },
+
+  updatePageTitle(title) {
+    const trimmed = title.trim().slice(0, 128);
+    if (!trimmed) return;
+    set((state) => ({ page: { ...state.page, title: trimmed } }));
   },
 
   setPage(newPage) {

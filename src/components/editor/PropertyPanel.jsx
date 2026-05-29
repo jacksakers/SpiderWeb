@@ -43,7 +43,11 @@ function PropertyPanel() {
     [selectedElementId, page.elements, updateElement]
   );
 
-  if (!element) return null;
+  if (!element) return (
+    <div className="p-4 text-white/20 text-xs text-center">
+      Select an element to edit its properties.
+    </div>
+  );
 
   return (
     <div className="w-64 shrink-0 bg-black/70 border-l border-white/10 p-4 flex flex-col gap-4 overflow-y-auto text-white text-sm backdrop-blur">

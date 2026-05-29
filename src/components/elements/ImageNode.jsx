@@ -10,7 +10,7 @@ import { useTabStore } from '../../store/tabStore';
  * - In editor mode: draggable/resizable via react-rnd
  * - Phase 2: src will be a Firebase Storage URL
  */
-const ImageNode = React.memo(function ImageNode({ id, data }) {
+const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
   const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
   const navigateTo = useTabStore((s) => s.navigateTo);
   const isSelected = selectedElementId === id;
@@ -92,6 +92,7 @@ const ImageNode = React.memo(function ImageNode({ id, data }) {
       onDragStop={handleDragStop}
       onResizeStop={handleResizeStop}
       style={{ zIndex: data.zIndex ?? 1 }}
+      scale={scale}
       bounds="parent"
     >
       {imgEl}

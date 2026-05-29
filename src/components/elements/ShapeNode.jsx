@@ -8,7 +8,7 @@ import { useTabStore } from '../../store/tabStore';
  *
  * Triangle is achieved via a CSS border trick without any SVG/Canvas API.
  */
-const ShapeNode = React.memo(function ShapeNode({ id, data }) {
+const ShapeNode = React.memo(function ShapeNode({ id, data, scale = 1 }) {
   const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
   const navigateTo = useTabStore((s) => s.navigateTo);
   const isSelected = selectedElementId === id;
@@ -101,6 +101,7 @@ const ShapeNode = React.memo(function ShapeNode({ id, data }) {
       onDragStop={handleDragStop}
       onResizeStop={handleResizeStop}
       style={{ zIndex: data.zIndex ?? 1 }}
+      scale={scale}
       bounds="parent"
     >
       {inner}
