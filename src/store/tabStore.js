@@ -24,9 +24,16 @@ function makeTab(pageId = 'demo', title = 'New Tab') {
   };
 }
 
+// Read the hash synchronously at module load time — before any React effects
+// can overwrite it — so the first tab opens the correct page.
+const _initialPageId = (() => {
+  if (typeof window === 'undefined') return 'demo';
+  return window.location.hash.replace(/^#/, '').trim() || 'demo';
+})();
+
 export const useTabStore = create((set, get) => ({
   // ─── State ────────────────────────────────────────────────────────────────
-  tabs: [makeTab('demo', 'My Retro Space')],
+  tabs: [makeTab(_initialPageId, _initialPageId === 'demo' ? 'My Retro Space' : _initialPageId)],
   activeTabId: null,   // initialised to tabs[0].id after first render
 
   // ─── Init ─────────────────────────────────────────────────────────────────
