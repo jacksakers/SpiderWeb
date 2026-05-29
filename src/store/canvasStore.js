@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { isFirebaseConfigured, db } from '../utils/firebase';
 import { validateBlueprint } from '../utils/blueprintSchema';
+import { useHistoryStore } from '../store/historyStore';
 import {
   MAX_CANVAS_WIDTH,
   DEFAULT_CANVAS_HEIGHT,
@@ -73,6 +74,7 @@ export const useCanvasStore = create((set, get) => ({
           page:       { pageId, ...snap.data() },
           pageStatus: 'loaded',
         });
+        useHistoryStore.getState().init(snap.data().elements ?? {});
       }
     } catch (err) {
       console.error('loadPage error', err);
@@ -134,13 +136,14 @@ export const useCanvasStore = create((set, get) => ({
   // ─── Element CRUD ─────────────────────────────────────────────────────────
   addElement(element) {
     const { id, ...rest } = element;
-    set((state) => ({
-      page: {
-        ...state.page,
-        elements: { ...state.page.elements, [id]: rest },
-      },
-      selectedElementId: id,
-    }));
+    set((state) => {
+      const elements = { ...state.page.elements, [id]: rest };
+      useHistoryStore.getState().commit(elements);
+      return {
+        page: { ...state.page, elements },
+        selectedElementId: id,
+      };
+    });
   },
 
   updateElement(id, patch) {
@@ -156,11 +159,23 @@ export const useCanvasStore = create((set, get) => ({
     });
   },
 
+  /** Call after a drag/resize stop to commit the position change to history */
+  commitElement(id, patch) {
+    set((state) => {
+      const existing = state.page.elements[id];
+      if (!existing) return state;
+      const elements = { ...state.page.elements, [id]: { ...existing, ...patch } };
+      useHistoryStore.getState().commit(elements);
+      return { page: { ...state.page, elements } };
+    });
+  },
+
   deleteElement(id) {
     set((state) => {
-      const { [id]: _removed, ...rest } = state.page.elements;
+      const { [id]: _removed, ...elements } = state.page.elements;
+      useHistoryStore.getState().commit(elements);
       return {
-        page: { ...state.page, elements: rest },
+        page: { ...state.page, elements },
         selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
       };
     });
@@ -204,5 +219,24 @@ export const useCanvasStore = create((set, get) => ({
   // Legacy toggle — now requires external permission check before calling
   toggleEditing() {
     set((state) => ({ isEditing: !state.isEditing, selectedElementId: null }));
+  },
+
+  // ─── Undo / Redo ──────────────────────────────────────────────────────────
+  undo() {
+    const elements = useHistoryStore.getState().undo();
+    if (elements === null) return;
+    set((state) => ({
+      page: { ...state.page, elements },
+      selectedElementId: null,
+    }));
+  },
+
+  redo() {
+    const elements = useHistoryStore.getState().redo();
+    if (elements === null) return;
+    set((state) => ({
+      page: { ...state.page, elements },
+      selectedElementId: null,
+    }));
   },
 }));

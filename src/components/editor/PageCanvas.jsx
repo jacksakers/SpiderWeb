@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { calculateScaleFactor, clientToCanvasCoords } from '../../utils/canvasGeometry';
 import { createImageElement } from '../../utils/elementFactory';
+import { uploadImage } from '../../utils/imageUpload';
 import TextNode from '../elements/TextNode';
 import ImageNode from '../elements/ImageNode';
 import ShapeNode from '../elements/ShapeNode';
@@ -45,7 +46,7 @@ function PageCanvas() {
 
   const handleDragLeave = useCallback(() => setIsDragOver(false), []);
 
-  const handleDrop = useCallback((e) => {
+  const handleDrop = useCallback(async (e) => {
     if (!isEditing) return;
     e.preventDefault();
     setIsDragOver(false);
@@ -53,17 +54,14 @@ function PageCanvas() {
     const file = e.dataTransfer.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
 
-    // Calculate canvas-local coords for the drop position
     const rect = e.currentTarget.getBoundingClientRect();
     const { x, y } = clientToCanvasCoords(e, rect, scale);
 
-    // Phase 1: create an object URL for preview; Phase 2: upload to Firebase Storage
-    const objectUrl = URL.createObjectURL(file);
-    const element = createImageElement({ x, y, src: objectUrl, alt: file.name });
+    // Upload to Firebase Storage (or blob URL if offline)
+    const src = await uploadImage(file, page.pageId);
+    const element = createImageElement({ x, y, src, alt: file.name });
     addElement(element);
-
-    // TODO (Phase 2): revoke objectUrl after Firebase upload resolves and replace src
-  }, [isEditing, scale, addElement]);
+  }, [isEditing, scale, addElement, page.pageId]);
 
   // ─── Render elements ───────────────────────────────────────────────────────
   const elementEntries = Object.entries(page.elements);

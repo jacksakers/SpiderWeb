@@ -1,19 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { isFirebaseConfigured } from '../../utils/firebase';
 
 /**
- * LoginModal — sign-in overlay shown when Firebase is configured but user is not authenticated.
- * Supports Google Sign-In and anonymous ("guest") mode.
+ * LoginModal — sign-in overlay with three modes: Sign In, Sign Up, Forgot Password.
  */
 function LoginModal({ onClose }) {
-  const { signInWithGoogle, signInAnon, authError, loading } = useAuthStore();
+  const { signIn, signUp, signInAnon, resetPassword, authError, loading } = useAuthStore();
+
+  const [mode, setMode]         = useState('signin'); // 'signin' | 'signup' | 'reset'
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName]         = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   if (!isFirebaseConfigured()) return null;
 
-  async function handleGoogle() {
-    await signInWithGoogle();
-    onClose?.();
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (mode === 'signin') {
+      await signIn(email, password);
+    } else if (mode === 'signup') {
+      await signUp(email, password, name.trim());
+    } else if (mode === 'reset') {
+      const ok = await resetPassword(email);
+      if (ok) setResetSent(true);
+    }
+    // onAuthStateChanged will close the modal by updating user state
   }
 
   async function handleAnon() {
@@ -23,12 +36,16 @@ function LoginModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 w-full max-w-sm flex flex-col gap-6 shadow-2xl">
-        {/* Logo / title */}
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 w-full max-w-sm flex flex-col gap-5 shadow-2xl">
+        {/* Logo */}
         <div className="text-center">
           <p className="text-4xl mb-2">🌐</p>
           <h1 className="text-2xl font-bold text-white">SpiderWeb</h1>
-          <p className="text-white/50 text-sm mt-1">Sign in to create and save your pages</p>
+          <p className="text-white/50 text-sm mt-1">
+            {mode === 'signin'  && 'Sign in to your account'}
+            {mode === 'signup'  && 'Create an account'}
+            {mode === 'reset'   && 'Reset your password'}
+          </p>
         </div>
 
         {/* Error */}
@@ -38,51 +55,106 @@ function LoginModal({ onClose }) {
           </p>
         )}
 
-        {/* Actions */}
-        <div className="flex flex-col gap-3">
-          <button
-            onClick={handleGoogle}
-            disabled={loading}
-            className="flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-white text-gray-900 font-medium text-sm hover:bg-gray-100 transition-colors disabled:opacity-50"
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
+        {resetSent ? (
+          <div className="text-center text-green-400 text-sm py-4">
+            ✓ Password reset email sent! Check your inbox.
+            <button onClick={() => { setMode('signin'); setResetSent(false); }} className="block mx-auto mt-3 text-white/50 hover:text-white text-xs underline">
+              Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            {mode === 'signup' && (
+              <input
+                type="text"
+                placeholder="Display name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                maxLength={64}
+                className="bg-white/10 rounded-lg px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            )}
+            <input
+              type="email"
+              placeholder="Email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="bg-white/10 rounded-lg px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:ring-1 focus:ring-purple-500"
+            />
+            {mode !== 'reset' && (
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="bg-white/10 rounded-lg px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            )}
 
-          <button
-            onClick={handleAnon}
-            disabled={loading}
-            className="flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-white/10 text-white font-medium text-sm hover:bg-white/20 transition-colors disabled:opacity-50"
-          >
-            👤 Continue as Guest
-          </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Please wait…' : mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Email'}
+            </button>
+          </form>
+        )}
+
+        {/* Mode switchers */}
+        <div className="flex flex-col items-center gap-1 text-xs">
+          {mode === 'signin' && (
+            <>
+              <button onClick={() => setMode('signup')} className="text-purple-400 hover:text-purple-300">
+                Don't have an account? Sign up
+              </button>
+              <button onClick={() => setMode('reset')} className="text-white/30 hover:text-white/60">
+                Forgot password?
+              </button>
+            </>
+          )}
+          {mode === 'signup' && (
+            <button onClick={() => setMode('signin')} className="text-purple-400 hover:text-purple-300">
+              Already have an account? Sign in
+            </button>
+          )}
+          {mode === 'reset' && !resetSent && (
+            <button onClick={() => setMode('signin')} className="text-white/40 hover:text-white">
+              Back to Sign In
+            </button>
+          )}
         </div>
 
-        <p className="text-white/30 text-xs text-center">
-          Guest accounts are not linked to your Google profile. You can upgrade later.
+        {/* Divider */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-white/30 text-xs">or</span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        <button
+          onClick={handleAnon}
+          disabled={loading}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/10 text-white/70 font-medium text-sm hover:bg-white/20 transition-colors disabled:opacity-50"
+        >
+          👤 Continue as Guest
+        </button>
+
+        <p className="text-white/20 text-xs text-center">
+          Guest accounts can't be recovered. Link an email in settings later.
         </p>
 
         {onClose && (
-          <button
-            onClick={onClose}
-            className="text-white/30 hover:text-white text-xs text-center transition-colors"
-          >
-            Dismiss — browse without signing in
+          <button onClick={onClose} className="text-white/20 hover:text-white/50 text-xs text-center transition-colors">
+            Dismiss
           </button>
         )}
       </div>
     </div>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 48 48">
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-    </svg>
   );
 }
 

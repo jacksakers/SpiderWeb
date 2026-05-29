@@ -4,6 +4,7 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { useAuthStore } from '../../store/authStore';
 import { usePageLoader } from '../../hooks/usePageLoader';
 import { useSavePage } from '../../hooks/useSavePage';
+import { useEditorShortcuts } from '../../hooks/useEditorShortcuts';
 import TabBar from './TabBar';
 import AddressBar from './AddressBar';
 import EditorToolbar from '../editor/EditorToolbar';
@@ -37,6 +38,9 @@ function MetaBrowser() {
 
   // Auto-save debounce
   useSavePage();
+
+  // Keyboard shortcuts: Ctrl+Z/Y, Ctrl+C/V, Delete
+  useEditorShortcuts();
 
   const showPropertyPanel = isEditing && selectedElementId !== null;
   const isLoading   = status === 'loading';

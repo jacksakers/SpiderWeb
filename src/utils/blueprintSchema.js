@@ -11,7 +11,7 @@ const StyleSchema = z.object({
   textAlign: z.enum(['left', 'center', 'right']).optional(),
   borderRadius: z.string().optional(),
   opacity: z.number().min(0).max(1).optional(),
-}).strict();
+});
 
 // ─── Base fields shared by every element ────────────────────────────────────
 
@@ -37,8 +37,8 @@ const TextElementSchema = BaseElementSchema.extend({
 
 const ImageElementSchema = BaseElementSchema.extend({
   type: z.literal('image'),
-  // Phase 2: must be a Firebase Storage URL. Phase 1: any https URL.
-  src: z.string().url().max(1024),
+  // Accepts https URLs and blob: object URLs (local preview before Storage upload)
+  src: z.string().max(1024),
   alt: z.string().max(256).optional(),
 });
 

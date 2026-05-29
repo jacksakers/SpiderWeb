@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useAuthStore } from '../../store/authStore';
 import { createTextElement, createImageElement, createShapeElement } from '../../utils/elementFactory';
+import { uploadImage } from '../../utils/imageUpload';
 import ToolbarButton from './ToolbarButton';
 import CollaboratorsModal from './CollaboratorsModal';
 
@@ -23,13 +24,12 @@ function EditorToolbar() {
   function handleAddText()  { addElement(createTextElement({ x: 80, y: 80 })); }
   function handleAddShape(shape) { addElement(createShapeElement({ x: 100, y: 100, shape })); }
 
-  function handleImageFileChange(e) {
+  async function handleImageFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const objectUrl = URL.createObjectURL(file);
-    addElement(createImageElement({ x: 100, y: 100, src: objectUrl, alt: file.name }));
+    const src = await uploadImage(file, page.pageId);
+    addElement(createImageElement({ x: 100, y: 100, src, alt: file.name }));
     e.target.value = '';
-    // Phase 2: upload to Firebase Storage then replace src
   }
 
   function handleEditToggle() {

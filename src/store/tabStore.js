@@ -113,4 +113,14 @@ export const useTabStore = create((set, get) => ({
       return { tabs };
     });
   },
+
+  /** Update the title of the currently active tab (called after Firestore page load) */
+  updateActiveTabTitle(title) {
+    if (!title) return;
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === state.activeTabId ? { ...tab, title } : tab,
+      ),
+    }));
+  },
 }));

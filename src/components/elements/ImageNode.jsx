@@ -11,22 +11,22 @@ import { useTabStore } from '../../store/tabStore';
  * - Phase 2: src will be a Firebase Storage URL
  */
 const ImageNode = React.memo(function ImageNode({ id, data }) {
-  const { updateElement, selectElement, selectedElementId, isEditing } = useCanvasStore();
+  const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
   const navigateTo = useTabStore((s) => s.navigateTo);
   const isSelected = selectedElementId === id;
 
   const handleDragStop = useCallback((_e, d) => {
-    updateElement(id, { x: d.x, y: d.y });
-  }, [id, updateElement]);
+    commitElement(id, { x: d.x, y: d.y });
+  }, [id, commitElement]);
 
   const handleResizeStop = useCallback((_e, _dir, ref, _delta, pos) => {
-    updateElement(id, {
+    commitElement(id, {
       width: parseInt(ref.style.width, 10),
       height: parseInt(ref.style.height, 10),
       x: pos.x,
       y: pos.y,
     });
-  }, [id, updateElement]);
+  }, [id, commitElement]);
 
   const handleClick = useCallback((e) => {
     e.stopPropagation();

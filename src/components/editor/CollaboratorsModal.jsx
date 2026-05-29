@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useAuthStore } from '../../store/authStore';
 import { doc, getDoc } from 'firebase/firestore';
@@ -63,7 +64,7 @@ function CollaboratorsModal({ onClose }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
       <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-full max-w-md shadow-2xl">
         <div className="flex items-center justify-between mb-5">
@@ -160,6 +161,8 @@ function CollaboratorsModal({ onClose }) {
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
 
 export default CollaboratorsModal;
