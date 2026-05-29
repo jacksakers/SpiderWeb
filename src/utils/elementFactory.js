@@ -22,6 +22,7 @@ export function createTextElement({ x = 100, y = 100 } = {}) {
     width: DEFAULT_TEXT_WIDTH,
     height: DEFAULT_TEXT_HEIGHT,
     zIndex: 1,
+    rotation: 0,
     content: 'Double-click to edit',
     style: {
       color: '#ffffff',
@@ -41,6 +42,7 @@ export function createImageElement({ x = 100, y = 100, src = '', alt = '' } = {}
     width: DEFAULT_IMAGE_WIDTH,
     height: DEFAULT_IMAGE_HEIGHT,
     zIndex: 1,
+    rotation: 0,
     src,
     alt,
     style: {},
@@ -56,6 +58,7 @@ export function createShapeElement({ x = 100, y = 100, shape = 'rectangle' } = {
     width: DEFAULT_SHAPE_WIDTH,
     height: DEFAULT_SHAPE_HEIGHT,
     zIndex: 1,
+    rotation: 0,
     shape,
     style: {
       backgroundColor: '#aa3bff',

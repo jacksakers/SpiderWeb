@@ -1,79 +1,94 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
+import { useAuthStore } from '../../store/authStore';
 import { createTextElement, createImageElement, createShapeElement } from '../../utils/elementFactory';
 import ToolbarButton from './ToolbarButton';
+import CollaboratorsModal from './CollaboratorsModal';
 
 /**
- * EditorToolbar — floating toolbar for adding elements and toggling edit mode.
+ * EditorToolbar — adds elements, toggles edit mode, shows save status, and
+ * opens the collaborators/share modal.
  *
- * Add Text → createTextElement → canvasStore.addElement
- * Add Image → triggers a hidden <input type="file"> for Phase 1 local preview
- *             (Phase 2: upload to Firebase Storage first, then add element)
- * Add Shape → prompts shape selection then creates ShapeNode
+ * Edit mode is gated: button only appears if the current user has permission.
  */
 function EditorToolbar() {
-  const { isEditing, toggleEditing, addElement } = useCanvasStore();
+  const { isEditing, setEditing, addElement, canUserEdit, page, isSaving } = useCanvasStore();
+  const { user } = useAuthStore();
   const fileInputRef = useRef(null);
+  const [showShare, setShowShare] = useState(false);
 
-  function handleAddText() {
-    addElement(createTextElement({ x: 80, y: 80 }));
-  }
+  const canEdit    = canUserEdit(user?.uid ?? null);
+  const isOwner    = user?.uid && user.uid === page.ownerId;
 
-  function handleAddShape(shape) {
-    addElement(createShapeElement({ x: 100, y: 100, shape }));
-  }
+  function handleAddText()  { addElement(createTextElement({ x: 80, y: 80 })); }
+  function handleAddShape(shape) { addElement(createShapeElement({ x: 100, y: 100, shape })); }
 
   function handleImageFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
     addElement(createImageElement({ x: 100, y: 100, src: objectUrl, alt: file.name }));
-    // Reset so the same file can be re-selected
     e.target.value = '';
+    // Phase 2: upload to Firebase Storage then replace src
+  }
+
+  function handleEditToggle() {
+    if (!canEdit) return;
+    setEditing(!isEditing);
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap p-2 bg-black/60 border-b border-white/10 backdrop-blur">
-      {/* Edit Mode Toggle */}
-      <ToolbarButton onClick={toggleEditing} active={isEditing} title="Toggle edit mode">
-        {isEditing ? '✏️ Editing' : '👁 View'}
-      </ToolbarButton>
+    <div className="flex items-center gap-2 flex-wrap px-3 py-2 bg-black/60 border-b border-white/10 backdrop-blur min-h-[44px]">
+
+      {/* Page title */}
+      <span className="text-white/60 text-xs font-mono truncate max-w-[160px] hidden sm:block">
+        sw://{page.pageId}
+      </span>
+
+      {canEdit && (
+        <>
+          <div className="w-px h-5 bg-white/20 hidden sm:block" />
+
+          {/* Edit mode toggle */}
+          <ToolbarButton onClick={handleEditToggle} active={isEditing} title="Toggle edit mode">
+            {isEditing ? '✏️ Editing' : '👁 View'}
+          </ToolbarButton>
+        </>
+      )}
 
       {isEditing && (
         <>
           <div className="w-px h-5 bg-white/20" />
 
-          {/* Add Elements */}
-          <ToolbarButton onClick={handleAddText} title="Add a text box">
-            T Text
-          </ToolbarButton>
-
-          <ToolbarButton onClick={() => fileInputRef.current?.click()} title="Add an image">
-            🖼 Image
-          </ToolbarButton>
-
-          <ToolbarButton onClick={() => handleAddShape('rectangle')} title="Add rectangle">
-            ▭ Rect
-          </ToolbarButton>
-
-          <ToolbarButton onClick={() => handleAddShape('circle')} title="Add circle">
-            ◯ Circle
-          </ToolbarButton>
-
-          <ToolbarButton onClick={() => handleAddShape('triangle')} title="Add triangle">
-            △ Triangle
-          </ToolbarButton>
+          <ToolbarButton onClick={handleAddText}                  title="Add a text box">T Text</ToolbarButton>
+          <ToolbarButton onClick={() => fileInputRef.current?.click()} title="Add an image">🖼 Image</ToolbarButton>
+          <ToolbarButton onClick={() => handleAddShape('rectangle')}    title="Add rectangle">▭ Rect</ToolbarButton>
+          <ToolbarButton onClick={() => handleAddShape('circle')}        title="Add circle">◯ Circle</ToolbarButton>
+          <ToolbarButton onClick={() => handleAddShape('triangle')}      title="Add triangle">△ Tri</ToolbarButton>
         </>
       )}
 
-      {/* Hidden file input for image picking */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleImageFileChange}
-      />
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Share button (owner only) */}
+      {isOwner && (
+        <ToolbarButton onClick={() => setShowShare(true)} title="Share & Collaborators">
+          🔗 Share
+        </ToolbarButton>
+      )}
+
+      {/* Save status */}
+      {isEditing && (
+        <span className={`text-xs shrink-0 ${isSaving ? 'text-yellow-400' : 'text-white/30'}`}>
+          {isSaving ? '● Saving…' : '✓ Saved'}
+        </span>
+      )}
+
+      {/* Hidden file input */}
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
+
+      {showShare && <CollaboratorsModal onClose={() => setShowShare(false)} />}
     </div>
   );
 }

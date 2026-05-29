@@ -22,7 +22,8 @@ const BaseElementSchema = z.object({
   width: z.union([z.number(), z.literal('auto')]),
   height: z.union([z.number(), z.literal('auto')]),
   zIndex: z.number().int().min(0).max(999).optional(),
-  href: z.string().max(128).optional(),   // Page ID to navigate to on click
+  rotation: z.number().min(-360).max(360).optional(),
+  href: z.string().max(128).optional(),
   style: StyleSchema.optional(),
 });
 
@@ -57,13 +58,15 @@ const ElementSchema = z.discriminatedUnion('type', [
 // ─── Full page blueprint ─────────────────────────────────────────────────────
 
 export const PageBlueprintSchema = z.object({
-  ownerId: z.string().max(128),
-  title: z.string().max(128),
+  ownerId:  z.string().max(128),
+  title:    z.string().max(128),
+  editors:  z.array(z.string().max(128)).optional(),
+  isPublic: z.boolean().optional(),
   theme: z.object({
     backgroundColor: z.string().optional(),
     backgroundImage: z.string().max(512).optional(),
-    width: z.number().default(1200),
-    height: z.number().default(2000),
+    width:           z.number().default(1200),
+    height:          z.number().default(2000),
   }),
   // Dictionary keyed by element ID — O(1) lookup/update/delete
   elements: z.record(z.string(), ElementSchema),

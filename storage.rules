@@ -1,0 +1,42 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ─── Helper functions ─────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isUnderSizeLimit() {
+      // 5 MB maximum per upload
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // ─── Public read on all stored assets ─────────────────────────────────────
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+
+    // ─── User avatars: users/{uid}/avatar.* ───────────────────────────────────
+    match /users/{userId}/{fileName} {
+      allow write: if isSignedIn()
+        && request.auth.uid == userId
+        && isImage()
+        && isUnderSizeLimit();
+    }
+
+    // ─── Page assets: pages/{pageId}/{fileName} ───────────────────────────────
+    // Any authenticated user can upload images to a page's asset folder.
+    // Phase 3: restrict writes to page owner/editors via a Firestore check.
+    match /pages/{pageId}/{fileName} {
+      allow write: if isSignedIn()
+        && isImage()
+        && isUnderSizeLimit();
+    }
+  }
+}

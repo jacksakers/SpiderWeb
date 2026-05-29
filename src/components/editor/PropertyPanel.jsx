@@ -61,7 +61,7 @@ function PropertyPanel() {
         </button>
       </div>
 
-      {/* Position & Size */}
+      {/* Position, Size & Rotation */}
       <Section label="Transform">
         <Row label="X">
           <NumInput value={element.x} onChange={(v) => update({ x: v })} />
@@ -79,6 +79,25 @@ function PropertyPanel() {
             <NumInput value={element.height} onChange={(v) => update({ height: v })} min={20} />
           </Row>
         )}
+        <Row label="°">
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={-180}
+              max={180}
+              step={1}
+              value={element.rotation ?? 0}
+              onChange={(e) => update({ rotation: Number(e.target.value) })}
+              className="flex-1 accent-purple-500"
+            />
+            <NumInput
+              value={element.rotation ?? 0}
+              onChange={(v) => update({ rotation: v })}
+              min={-360}
+              max={360}
+            />
+          </div>
+        </Row>
       </Section>
 
       {/* Z-index */}
@@ -115,10 +134,11 @@ function PropertyPanel() {
             <select
               value={element.style?.fontFamily ?? 'Comic Sans MS'}
               onChange={(e) => updateStyle({ fontFamily: e.target.value })}
-              className="bg-white/10 rounded px-1 py-0.5 text-xs w-full"
+              className="bg-[#222] text-white rounded px-1 py-0.5 text-xs w-full border border-white/10"
+              style={{ backgroundColor: '#222', color: '#fff' }}
             >
               {AVAILABLE_FONTS.map((f) => (
-                <option key={f} value={f} style={{ fontFamily: f }}>
+                <option key={f} value={f} style={{ backgroundColor: '#222', color: '#fff', fontFamily: f }}>
                   {f}
                 </option>
               ))}

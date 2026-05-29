@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(pageData) {
+      return isSignedIn() && request.auth.uid == pageData.ownerId;
+    }
+
+    function isEditor(pageData) {
+      return isSignedIn() && request.auth.uid in pageData.editors;
+    }
+
+    function isPublicPage(pageData) {
+      return pageData.isPublic == true;
+    }
+
+    function canEdit(pageData) {
+      return isOwner(pageData) || isEditor(pageData) || isPublicPage(pageData);
+    }
+
+    // Prevent storing script tags anywhere in the document
+    function noScriptTags(data) {
+      return !('content' in data) || !data.content.matches('.*<script.*');
+    }
+
+    // ─── Pages ───────────────────────────────────────────────────────────────
+    match /pages/{pageId} {
+
+      // Anyone can read any page (enables the public "browser" experience)
+      allow read: if true;
+
+      // Only authenticated users can create pages; they must set themselves as owner
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasAll(['ownerId', 'title', 'theme', 'elements']);
+
+      // Updates allowed for owner, listed editors, or if page is public
+      allow update: if isSignedIn()
+        && canEdit(resource.data)
+        // Owner field is immutable once set
+        && request.resource.data.ownerId == resource.data.ownerId;
+
+      // Only the owner can delete their page
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ─── User profiles ───────────────────────────────────────────────────────
+    match /users/{userId} {
+
+      // Profiles are public — needed for displaying author names
+      allow read: if true;
+
+      // Users can only write their own profile
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+  }
+}

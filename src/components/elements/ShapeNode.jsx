@@ -62,6 +62,7 @@ const ShapeNode = React.memo(function ShapeNode({ id, data }) {
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
+        transform: `rotate(${data.rotation ?? 0}deg)`,
       }}
       onClick={handleClick}
     >

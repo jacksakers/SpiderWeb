@@ -60,6 +60,7 @@ const TextNode = React.memo(function TextNode({ id, data }) {
         boxSizing: 'border-box',
         padding: '4px',
         overflow: 'hidden',
+        transform: `rotate(${data.rotation ?? 0}deg)`,
         ...data.style,
       }}
       onClick={handleClick}

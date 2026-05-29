@@ -52,6 +52,7 @@ const ImageNode = React.memo(function ImageNode({ id, data }) {
         cursor: isEditing ? 'move' : data.href ? 'pointer' : 'default',
         overflow: 'hidden',
         boxSizing: 'border-box',
+        transform: `rotate(${data.rotation ?? 0}deg)`,
         ...data.style,
       }}
       onClick={handleClick}
@@ -59,8 +60,9 @@ const ImageNode = React.memo(function ImageNode({ id, data }) {
       <img
         src={data.src}
         alt={data.alt ?? ''}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        // Never allow JS in image URLs; no onerror/onload handlers
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', userSelect: 'none', pointerEvents: 'none' }}
         onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
       />
     </div>
