@@ -24,6 +24,7 @@ const BaseElementSchema = z.object({
   zIndex: z.number().int().min(0).max(999).optional(),
   rotation: z.number().min(-360).max(360).optional(),
   href: z.string().max(128).optional(),
+  target: z.enum(['_self', '_blank']).optional(),
   style: StyleSchema.optional(),
 });
 

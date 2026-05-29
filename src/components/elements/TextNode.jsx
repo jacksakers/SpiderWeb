@@ -14,6 +14,7 @@ import { useTabStore } from '../../store/tabStore';
 const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
   const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
   const navigateTo = useTabStore((s) => s.navigateTo);
+  const openInNewTab = useTabStore((s) => s.openInNewTab);
   const isSelected = selectedElementId === id;
 
   const [localText, setLocalText] = useState(data.content);
@@ -36,11 +37,15 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
     e.stopPropagation();
     if (!isEditing && data.href) {
       e.preventDefault();
-      navigateTo(data.href);
+      if (data.target === '_blank') {
+        openInNewTab(data.href, data.title);
+      } else {
+        navigateTo(data.href, data.title);
+      }
       return;
     }
     selectElement(id);
-  }, [id, isEditing, data.href, selectElement, navigateTo]);
+  }, [id, isEditing, data.href, data.target, data.title, selectElement, navigateTo, openInNewTab]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!isEditing) return;

@@ -44,6 +44,15 @@ export const useTabStore = create((set, get) => ({
     }
   },
 
+  // Open in new tab from external link (e.g. from ImageNode) — creates a new tab with the given pageId and title.
+  openInNewTab(pageId, title) {
+    const newTab = makeTab(pageId, title);
+    set((state) => ({
+      tabs: [...state.tabs, newTab],
+      activeTabId: newTab.id,
+    }));
+  },
+
   // ─── Derived helper ───────────────────────────────────────────────────────
   getActiveTab() {
     const { tabs, activeTabId } = get();

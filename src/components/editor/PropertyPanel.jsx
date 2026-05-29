@@ -178,7 +178,15 @@ function PropertyPanel() {
               maxLength={128}
               onChange={(e) => update({ href: e.target.value })}
               className="bg-white/10 rounded px-2 py-0.5 text-xs w-full"
-              placeholder="Page ID to navigate to"
+              placeholder="Page ID"
+            />
+          </Row>
+          <Row label="Open in New Tab">
+            <input
+              type="checkbox"
+              checked={element.target === '_blank'}
+              onChange={(e) => update({ target: e.target.checked ? '_blank' : undefined })}
+              className="bg-white/10 rounded px-2 py-0.5 text-xs"
             />
           </Row>
         </Section>
@@ -212,7 +220,7 @@ function PropertyPanel() {
       {/* Link (all types) */}
       {element.type !== 'image' && (
         <Section label="Link">
-          <Row label="→ Page">
+          <Row label="Page">
             <input
               type="text"
               value={element.href ?? ''}
@@ -220,6 +228,14 @@ function PropertyPanel() {
               onChange={(e) => update({ href: e.target.value })}
               className="bg-white/10 rounded px-2 py-0.5 text-xs w-full"
               placeholder="Page ID"
+            />
+          </Row>
+          <Row label="Open in New Tab">
+            <input
+              type="checkbox"
+              checked={element.target === '_blank'}
+              onChange={(e) => update({ target: e.target.checked ? '_blank' : undefined })}
+              className="bg-white/10 rounded px-2 py-0.5 text-xs"
             />
           </Row>
         </Section>

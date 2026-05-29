@@ -11,6 +11,7 @@ import { useTabStore } from '../../store/tabStore';
 const ShapeNode = React.memo(function ShapeNode({ id, data, scale = 1 }) {
   const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
   const navigateTo = useTabStore((s) => s.navigateTo);
+  const openInNewTab = useTabStore((s) => s.openInNewTab);
   const isSelected = selectedElementId === id;
 
   const handleDragStop = useCallback((_e, d) => {
@@ -30,11 +31,15 @@ const ShapeNode = React.memo(function ShapeNode({ id, data, scale = 1 }) {
     e.stopPropagation();
     if (!isEditing && data.href) {
       e.preventDefault();
-      navigateTo(data.href);
+      if (data.target === '_blank') {
+        openInNewTab(data.href, data.title);
+      } else {
+        navigateTo(data.href, data.title);
+      }
       return;
     }
     selectElement(id);
-  }, [id, isEditing, data.href, selectElement, navigateTo]);
+  }, [id, isEditing, data.href, data.target, data.title, selectElement, navigateTo, openInNewTab]);
 
   const selectionRing = isSelected && isEditing ? '2px solid #aa3bff' : '2px solid transparent';
 

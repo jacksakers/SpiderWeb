@@ -13,6 +13,7 @@ import { useTabStore } from '../../store/tabStore';
 const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
   const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
   const navigateTo = useTabStore((s) => s.navigateTo);
+  const openInNewTab = useTabStore((s) => s.openInNewTab);
   const isSelected = selectedElementId === id;
 
   const handleDragStop = useCallback((_e, d) => {
@@ -33,11 +34,15 @@ const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
     if (!isEditing && data.href) {
       // Intercept link — navigate inside Meta-Browser instead of real nav
       e.preventDefault();
-      navigateTo(data.href);
+      if (data.target === '_blank') {
+        openInNewTab(data.href, data.title);
+      } else {
+        navigateTo(data.href, data.title);
+      }
       return;
     }
     selectElement(id);
-  }, [id, isEditing, data.href, selectElement, navigateTo]);
+  }, [id, isEditing, data.href, data.target, data.title, selectElement, navigateTo, openInNewTab]);
 
   const selectionRing = isSelected && isEditing
     ? '2px solid #aa3bff'
