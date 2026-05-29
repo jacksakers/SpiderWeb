@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { AVAILABLE_FONTS } from '../../constants/canvas';
 
@@ -50,7 +50,7 @@ function PropertyPanel() {
   );
 
   return (
-    <div className="w-64 shrink-0 bg-black/70 border-l border-white/10 p-4 flex flex-col gap-4 overflow-y-auto text-white text-sm backdrop-blur">
+    <div className="w-full bg-black/70 p-3 flex flex-col gap-3 overflow-y-auto text-white text-sm backdrop-blur">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-widest text-white/40">
@@ -58,7 +58,7 @@ function PropertyPanel() {
         </span>
         <button
           onClick={clearSelection}
-          className="text-white/40 hover:text-white text-lg leading-none"
+          className="text-white/40 hover:text-white text-xl leading-none p-1 -mr-1"
           title="Close panel"
         >
           ×
@@ -67,22 +67,17 @@ function PropertyPanel() {
 
       {/* Position, Size & Rotation */}
       <Section label="Transform">
-        <Row label="X">
-          <NumInput value={element.x} onChange={(v) => update({ x: v })} />
-        </Row>
-        <Row label="Y">
-          <NumInput value={element.y} onChange={(v) => update({ y: v })} />
-        </Row>
-        {element.width !== 'auto' && (
-          <Row label="W">
-            <NumInput value={element.width} onChange={(v) => update({ width: v })} min={40} />
-          </Row>
-        )}
-        {element.height !== 'auto' && (
-          <Row label="H">
-            <NumInput value={element.height} onChange={(v) => update({ height: v })} min={20} />
-          </Row>
-        )}
+        {/* 2-up grid for compact layout on both desktop and mobile */}
+        <div className="grid grid-cols-2 gap-2">
+          <ScrubRow label="X" value={element.x} onChange={(v) => update({ x: v })} />
+          <ScrubRow label="Y" value={element.y} onChange={(v) => update({ y: v })} />
+          {element.width !== 'auto' && (
+            <ScrubRow label="W" value={element.width} onChange={(v) => update({ width: v })} min={40} />
+          )}
+          {element.height !== 'auto' && (
+            <ScrubRow label="H" value={element.height} onChange={(v) => update({ height: v })} min={20} />
+          )}
+        </div>
         <Row label="°">
           <div className="flex items-center gap-2">
             <input
@@ -94,12 +89,9 @@ function PropertyPanel() {
               onChange={(e) => update({ rotation: Number(e.target.value) })}
               className="flex-1 accent-purple-500"
             />
-            <NumInput
-              value={element.rotation ?? 0}
-              onChange={(v) => update({ rotation: v })}
-              min={-360}
-              max={360}
-            />
+            <div className="w-20 shrink-0">
+              <ScrubInput value={element.rotation ?? 0} onChange={(v) => update({ rotation: v })} min={-360} max={360} />
+            </div>
           </div>
         </Row>
       </Section>
@@ -111,7 +103,7 @@ function PropertyPanel() {
           <PanelButton onClick={() => sendBackward(selectedElementId)}>↓ Back</PanelButton>
         </div>
         <Row label="Z">
-          <NumInput value={element.zIndex ?? 1} onChange={(v) => update({ zIndex: v })} min={0} max={999} />
+          <ScrubInput value={element.zIndex ?? 1} onChange={(v) => update({ zIndex: v })} min={0} max={999} />
         </Row>
       </Section>
 
@@ -127,7 +119,7 @@ function PropertyPanel() {
             />
           </Row>
           <Row label="Size">
-            <NumInput
+            <ScrubInput
               value={parseInt(element.style?.fontSize ?? '18', 10)}
               onChange={(v) => updateStyle({ fontSize: `${v}px` })}
               min={8}
@@ -154,7 +146,7 @@ function PropertyPanel() {
                 <button
                   key={a}
                   onClick={() => updateStyle({ textAlign: a })}
-                  className={`px-2 py-0.5 rounded text-xs ${
+                  className={`flex-1 px-2 py-1.5 rounded text-xs ${
                     element.style?.textAlign === a ? 'bg-purple-600' : 'bg-white/10'
                   }`}
                 >
@@ -236,7 +228,7 @@ function PropertyPanel() {
       {/* Delete */}
       <button
         onClick={() => deleteElement(selectedElementId)}
-        className="mt-auto px-3 py-1.5 rounded text-sm bg-red-900/50 hover:bg-red-700 text-red-200 transition-colors"
+        className="mt-auto px-3 py-2.5 rounded text-sm bg-red-900/50 hover:bg-red-700 text-red-200 transition-colors"
       >
         🗑 Delete element
       </button>
@@ -258,22 +250,75 @@ function Section({ label, children }) {
 function Row({ label, children }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-white/50 w-10 shrink-0 text-right text-xs">{label}</span>
+      <span className="text-white/50 w-8 shrink-0 text-right text-xs">{label}</span>
       <div className="flex-1">{children}</div>
     </div>
   );
 }
 
-function NumInput({ value, onChange, min, max }) {
+/**
+ * ScrubInput — numeric input with a ↔ drag handle for desktop scrubbing.
+ *
+ * - Drag the ↔ handle left/right to decrement/increment (1 px per pixel moved)
+ * - Click the number field to type directly
+ * - Works via pointer capture so the pointer can leave the element during drag
+ */
+function ScrubInput({ value, onChange, min = -Infinity, max = Infinity, step = 1 }) {
+  const startRef = useRef(null);
+
+  function handlePointerDown(e) {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, value: Number(value) };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e) {
+    if (!startRef.current) return;
+    const delta = Math.round((e.clientX - startRef.current.x) * step);
+    const raw = startRef.current.value + delta;
+    const clamped = Math.max(
+      min === -Infinity ? raw : min,
+      Math.min(max === Infinity ? raw : max, raw),
+    );
+    onChange(clamped);
+  }
+
+  function handlePointerUp() {
+    startRef.current = null;
+  }
+
   return (
-    <input
-      type="number"
-      value={value}
-      min={min}
-      max={max}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="bg-white/10 rounded px-2 py-0.5 text-xs w-full"
-    />
+    <div className="flex items-center bg-white/10 rounded overflow-hidden">
+      {/* Scrub handle — desktop only */}
+      <div
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        className="hidden sm:flex px-1.5 items-center text-white/30 hover:text-white/70 border-r border-white/10 select-none"
+        style={{ cursor: 'ew-resize', height: '100%', minWidth: '22px', justifyContent: 'center' }}
+        title="Drag to scrub"
+      >
+        ↔
+      </div>
+      <input
+        type="number"
+        value={value}
+        min={min === -Infinity ? undefined : min}
+        max={max === Infinity ? undefined : max}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="bg-transparent text-xs text-white px-2 py-1 w-full outline-none"
+      />
+    </div>
+  );
+}
+
+/** Compact labelled scrub input for the 2-column transform grid */
+function ScrubRow({ label, value, onChange, min, max, step }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-white/40 text-[10px] uppercase tracking-wider">{label}</span>
+      <ScrubInput value={value} onChange={onChange} min={min} max={max} step={step} />
+    </div>
   );
 }
 
@@ -281,7 +326,7 @@ function PanelButton({ onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className="px-2 py-0.5 rounded text-xs bg-white/10 hover:bg-white/20 transition-colors"
+      className="flex-1 px-2 py-1.5 rounded text-xs bg-white/10 hover:bg-white/20 transition-colors"
     >
       {children}
     </button>

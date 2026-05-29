@@ -92,31 +92,39 @@ function DesktopSidePanel({ activeTab, onSelectTab, showProperties }) {
 }
 
 // ─── Mobile bottom sheet ──────────────────────────────────────────────────────
+// No full-screen scrim — the sheet floats over the bottom portion only so the
+// canvas above it remains visible and interactive.
 
 function MobileBottomSheet({ open, onClose, activeTab, onSelectTab, showProperties }) {
   if (!open) return null;
   return (
-    <>
-      {/* Scrim */}
-      <div
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-[#1a1a1a] border-t border-white/10 rounded-t-2xl"
-           style={{ maxHeight: '75dvh' }}>
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
-        </div>
-        <PanelTabs activeTab={activeTab} onSelect={onSelectTab} showProperties={showProperties} />
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {activeTab === 'properties' && showProperties
-            ? <PropertyPanel />
-            : <SocialPanel />}
-        </div>
+    <div
+      className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl shadow-2xl"
+      style={{
+        maxHeight: '48dvh',
+        background: 'rgba(20,20,20,0.97)',
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+      }}
+    >
+      {/* Drag handle + close */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0">
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto absolute left-1/2 -translate-x-1/2" />
+        <div className="flex-1" />
+        <button
+          onClick={onClose}
+          className="text-white/30 hover:text-white text-lg leading-none"
+          title="Close panel"
+        >
+          ×
+        </button>
       </div>
-    </>
+      <PanelTabs activeTab={activeTab} onSelect={onSelectTab} showProperties={showProperties} />
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {activeTab === 'properties' && showProperties
+          ? <PropertyPanel />
+          : <SocialPanel />}
+      </div>
+    </div>
   );
 }
 

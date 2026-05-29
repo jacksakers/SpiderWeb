@@ -125,6 +125,7 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
       position={{ x: data.x, y: data.y }}
       onDragStop={handleDragStop}
       onResizeStop={handleResizeStop}
+      disableDragging={!isSelected}
       style={{ zIndex: data.zIndex ?? 1 }}
       scale={scale}
       bounds="parent"
