@@ -4,6 +4,7 @@ Navigation button element — a pre-styled button element with a built-in link t
 Background image picker / color gradient — pick a solid color or upload a background image for the canvas. Huge for fan pages and blogs.
 Copy/paste style — Ctrl+Shift+C / Ctrl+Shift+V to copy style from one element and apply to another. Speeds up consistent styling.
 Text link within text — currently the whole TextNode is a link. Allowing a portion of text to link would unlock basic blog/nav patterns.
+Social Improvements - Add things like unique page visits and other social interactions to really flesh out the social tab. 
 
 Medium value
 Scrollable list / feed element — a box where you add multiple text+image rows that scroll. Lets users build "posts", band set lists, or FAQ sections.
@@ -15,7 +16,6 @@ Page template gallery — a few starter templates ("Blog Post", "Fan Page", "Lin
 Lower priority / future phase
 Sticky/fixed element flag — mark an element to stay in place when scrolling (for fixed navigation bars).
 Visible page grid / snap-to-grid — toggle a grid overlay with snapping (8px grid) for precise layouts.
-Emoji/sticker picker — a panel of common decorative stickers/emojis placed as text elements. Very Myspace/Geocities.
+Emoji/sticker picker — a panel of common decorative stickers/emojis/GIFs placed as elements. Very Myspace/Geocities.
 Animated GIF frame player control — currently GIFs just play; add the ability to pause/play.
-Page password protection — set a password to view a page (Firestore rules side).
 

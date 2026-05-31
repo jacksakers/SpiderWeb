@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Rnd } from 'react-rnd';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useTabStore } from '../../store/tabStore';
@@ -6,53 +6,41 @@ import { useTabStore } from '../../store/tabStore';
 /**
  * TextNode — renders a single text element on the canvas.
  *
- * - Read-only in renderer mode (isEditing=false)
- * - Draggable/resizable in editor mode via react-rnd
- * - Double-click OR property-panel textarea for inline text editing
- * - Shift+click adds to multi-selection
- * - All text rendered as plain string children (never innerHTML) per security rules
+ * Edit mode rules:
+ *  - Only the singly-selected element can be dragged/resized via react-rnd.
+ *  - When ≥2 elements are selected, all are locked; the MultiSelectBox handles movement.
+ *  - multiDragOffset (store) is applied as a real-time position shift so elements
+ *    visually follow the amber bounding box during a group drag.
+ *  - Shift+click or multiSelectMode tap adds to the selection.
+ *  - Double-click or PropertyPanel textarea for inline text editing.
  */
 const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
   const {
-    updateElement, selectElement, addToSelection, moveElements,
-    selectedElementId, selectedElementIds, isEditing, commitElement,
+    updateElement, selectElement, addToSelection,
+    selectedElementId, selectedElementIds, multiDragOffset, multiSelectMode,
+    isEditing, commitElement,
   } = useCanvasStore();
   const navigateTo   = useTabStore((s) => s.navigateTo);
   const openInNewTab = useTabStore((s) => s.openInNewTab);
+
   const isSelected      = selectedElementId === id;
-  const isMultiSelected = selectedElementIds.includes(id);
+  const isInGroup       = selectedElementIds.length > 1 && selectedElementIds.includes(id);
+  // Resize/drag only when this is the ONE selected element
+  const isSoleSelected  = isSelected && selectedElementIds.length === 1;
 
   const [localText, setLocalText] = useState(data.content);
   const [textEditing, setTextEditing] = useState(false);
-  const dragStartRef = useRef(null);
 
   // Keep localText in sync when content is changed from the PropertyPanel textarea
   React.useEffect(() => { setLocalText(data.content); }, [data.content]);
 
-  const handleDragStart = useCallback((_e, d) => {
-    dragStartRef.current = { x: d.x, y: d.y };
-  }, []);
-
   const handleDragStop = useCallback((_e, d) => {
-    const { selectedElementIds: ids, page } = useCanvasStore.getState();
-    if (ids.length > 1 && ids.includes(id)) {
-      const dx = d.x - (dragStartRef.current?.x ?? data.x);
-      const dy = d.y - (dragStartRef.current?.y ?? data.y);
-      const patches = {};
-      ids.forEach((sid) => {
-        const el = page.elements[sid];
-        if (el) patches[sid] = { x: el.x + dx, y: el.y + dy };
-      });
-      moveElements(patches);
-    } else {
-      commitElement(id, { x: d.x, y: d.y });
-    }
-    dragStartRef.current = null;
-  }, [id, data.x, data.y, commitElement, moveElements]);
+    commitElement(id, { x: d.x, y: d.y });
+  }, [id, commitElement]);
 
   const handleResizeStop = useCallback((_e, _dir, ref, _delta, pos) => {
     commitElement(id, {
-      width: parseInt(ref.style.width, 10),
+      width:  parseInt(ref.style.width,  10),
       height: parseInt(ref.style.height, 10),
       x: pos.x,
       y: pos.y,
@@ -63,19 +51,16 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
     e.stopPropagation();
     if (!isEditing && data.href) {
       e.preventDefault();
-      if (data.target === '_blank') {
-        openInNewTab(data.href, data.title);
-      } else {
-        navigateTo(data.href, data.title);
-      }
+      if (data.target === '_blank') openInNewTab(data.href, data.title);
+      else navigateTo(data.href, data.title);
       return;
     }
-    if (e.shiftKey && isEditing) {
+    if (isEditing && (e.shiftKey || multiSelectMode)) {
       addToSelection(id);
       return;
     }
     selectElement(id);
-  }, [id, isEditing, data.href, data.target, data.title, selectElement, addToSelection, navigateTo, openInNewTab]);
+  }, [id, isEditing, data.href, data.target, data.title, multiSelectMode, selectElement, addToSelection, navigateTo, openInNewTab]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!isEditing) return;
@@ -88,9 +73,13 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
     updateElement(id, { content: localText });
   }, [id, localText, updateElement]);
 
-  const selectionRing = (isSelected || isMultiSelected) && isEditing
-    ? `2px solid ${isMultiSelected && selectedElementIds.length > 1 ? '#f59e0b' : '#aa3bff'}`
+  const selectionRing = (isSelected || isInGroup) && isEditing
+    ? `2px solid ${isInGroup ? '#f59e0b' : '#aa3bff'}`
     : '2px solid transparent';
+
+  // During a group drag, shift this element by the live offset so it moves in sync
+  const liveX = isInGroup ? data.x + multiDragOffset.dx : data.x;
+  const liveY = isInGroup ? data.y + multiDragOffset.dy : data.y;
 
   const content = (
     <div
@@ -98,7 +87,7 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
         width: '100%',
         height: '100%',
         outline: selectionRing,
-        cursor: isEditing ? 'move' : data.href ? 'pointer' : 'default',
+        cursor: isEditing ? (isSoleSelected ? 'move' : 'default') : data.href ? 'pointer' : 'default',
         boxSizing: 'border-box',
         padding: '4px',
         overflow: 'hidden',
@@ -115,20 +104,13 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
           onChange={(e) => setLocalText(e.target.value)}
           onBlur={handleBlur}
           style={{
-            width: '100%',
-            height: '100%',
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            resize: 'none',
-            color: 'inherit',
-            fontSize: 'inherit',
-            fontFamily: 'inherit',
-            textAlign: 'inherit',
+            width: '100%', height: '100%',
+            background: 'transparent', border: 'none', outline: 'none',
+            resize: 'none', color: 'inherit', fontSize: 'inherit',
+            fontFamily: 'inherit', textAlign: 'inherit',
           }}
         />
       ) : (
-        // Render as plain text — XSS-safe
         <p style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {data.content}
         </p>
@@ -137,18 +119,8 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
   );
 
   if (!isEditing) {
-    // Pure renderer — no drag handles
     return (
-      <div
-        style={{
-          position: 'absolute',
-          left: data.x,
-          top: data.y,
-          width: data.width === 'auto' ? 'auto' : data.width,
-          height: data.height === 'auto' ? 'auto' : data.height,
-          zIndex: data.zIndex ?? 1,
-        }}
-      >
+      <div style={{ position: 'absolute', left: data.x, top: data.y, width: data.width === 'auto' ? 'auto' : data.width, height: data.height === 'auto' ? 'auto' : data.height, zIndex: data.zIndex ?? 1 }}>
         {content}
       </div>
     );
@@ -157,11 +129,11 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
   return (
     <Rnd
       size={{ width: data.width, height: data.height }}
-      position={{ x: data.x, y: data.y }}
-      onDragStart={handleDragStart}
+      position={{ x: liveX, y: liveY }}
       onDragStop={handleDragStop}
       onResizeStop={handleResizeStop}
-      disableDragging={textEditing || (!isSelected && !isMultiSelected)}
+      disableDragging={textEditing || !isSoleSelected}
+      enableResizing={isSoleSelected}
       style={{ zIndex: data.zIndex ?? 1 }}
       scale={scale}
       bounds="parent"

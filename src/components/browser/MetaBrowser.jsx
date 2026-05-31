@@ -205,6 +205,7 @@ function MetaBrowser() {
           <div
             className="flex-1 overflow-auto min-w-0"
             ref={(el) => { canvasViewport.scrollEl = el; }}
+            style={isMobile && mobilePanelOpen ? { paddingBottom: '48dvh' } : undefined}
           >
             <PageCanvas />
           </div>

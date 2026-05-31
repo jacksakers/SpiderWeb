@@ -30,7 +30,10 @@ function getViewportCenter(elementW, elementH) {
  * lets the owner rename the page title, and opens the collaborators modal.
  */
 function EditorToolbar() {
-  const { isEditing, setEditing, addElement, canUserEdit, page, isSaving, updatePageTitle } = useCanvasStore();
+  const {
+    isEditing, setEditing, addElement, canUserEdit, page, isSaving, updatePageTitle,
+    multiSelectMode, setMultiSelectMode,
+  } = useCanvasStore();
   const { user } = useAuthStore();
   const fileInputRef = useRef(null);
   const [showShare, setShowShare] = useState(false);
@@ -123,11 +126,29 @@ function EditorToolbar() {
         <>
           <div className="w-px h-5 bg-white/20" />
 
-          <ToolbarButton onClick={handleAddText}                  title="Add a text box">T Text</ToolbarButton>
-          <ToolbarButton onClick={() => fileInputRef.current?.click()} title="Add an image">🖼 Image</ToolbarButton>
-          <ToolbarButton onClick={() => handleAddShape('rectangle')}    title="Add rectangle">▭ Rect</ToolbarButton>
-          <ToolbarButton onClick={() => handleAddShape('circle')}        title="Add circle">◯ Circle</ToolbarButton>
-          <ToolbarButton onClick={() => handleAddShape('triangle')}      title="Add triangle">△ Tri</ToolbarButton>
+          {/* Select mode — primary multi-select path on mobile (tap to add) */}
+          <ToolbarButton
+            onClick={() => setMultiSelectMode(!multiSelectMode)}
+            active={multiSelectMode}
+            title="Select mode: tap elements to multi-select"
+          >
+            ◻ Select
+          </ToolbarButton>
+
+          <div className="w-px h-5 bg-white/20 hidden sm:block" />
+
+          <ToolbarButton onClick={handleAddText}                       title="Add a text box" className="hidden sm:flex">T Text</ToolbarButton>
+          <ToolbarButton onClick={() => fileInputRef.current?.click()} title="Add an image"   className="hidden sm:flex">🖼 Image</ToolbarButton>
+          <ToolbarButton onClick={() => handleAddShape('rectangle')}   title="Add rectangle"  className="hidden sm:flex">▭ Rect</ToolbarButton>
+          <ToolbarButton onClick={() => handleAddShape('circle')}      title="Add circle"     className="hidden sm:flex">◯ Circle</ToolbarButton>
+          <ToolbarButton onClick={() => handleAddShape('triangle')}    title="Add triangle"   className="hidden sm:flex">△ Tri</ToolbarButton>
+
+          {/* Collapsed add menu on mobile */}
+          <AddMenuMobile
+            onAddText={handleAddText}
+            onAddImage={() => fileInputRef.current?.click()}
+            onAddShape={handleAddShape}
+          />
         </>
       )}
 
@@ -157,3 +178,37 @@ function EditorToolbar() {
 }
 
 export default EditorToolbar;
+
+// ─── Mobile-only collapsed add menu ──────────────────────────────────────────
+function AddMenuMobile({ onAddText, onAddImage, onAddShape }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative sm:hidden">
+      <ToolbarButton onClick={() => setOpen((v) => !v)} active={open} title="Add element">
+        + Add
+      </ToolbarButton>
+      {open && (
+        <div
+          className="absolute top-full left-0 mt-1 z-50 flex flex-col gap-1 bg-[#1a1a1a] border border-white/10 rounded-lg p-2 shadow-xl min-w-[120px]"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {[
+            { label: 'T Text',    fn: onAddText },
+            { label: '🖼 Image',  fn: onAddImage },
+            { label: '▭ Rect',   fn: () => onAddShape('rectangle') },
+            { label: '◯ Circle', fn: () => onAddShape('circle') },
+            { label: '△ Triangle', fn: () => onAddShape('triangle') },
+          ].map(({ label, fn }) => (
+            <button
+              key={label}
+              onClick={() => { fn(); setOpen(false); }}
+              className="text-left text-xs text-white/80 hover:text-white hover:bg-white/10 rounded px-2 py-1.5 transition-colors"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

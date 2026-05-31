@@ -43,6 +43,17 @@ export const useCanvasStore = create((set, get) => ({
   /** Array of IDs for multi-select (always a superset of selectedElementId) */
   selectedElementIds: [],
   isEditing:          false,
+  /**
+   * When true, each tap/click on an element adds it to the selection instead
+   * of replacing it. Useful as the primary multi-select path on mobile.
+   */
+  multiSelectMode:    false,
+  /**
+   * Ephemeral drag offset applied to all grouped elements while a
+   * MultiSelectBox drag is in progress. Reset to {dx:0,dy:0} on commit.
+   * Never written to Firestore.
+   */
+  multiDragOffset: { dx: 0, dy: 0 },
 
   // ─── Permission helper ────────────────────────────────────────────────────
   canUserEdit(userId) {
@@ -229,9 +240,9 @@ export const useCanvasStore = create((set, get) => ({
 
   // ─── Selection ────────────────────────────────────────────────────────────
   selectElement(id)  { set({ selectedElementId: id, selectedElementIds: [id] }); },
-  clearSelection()   { set({ selectedElementId: null, selectedElementIds: [] }); },
+  clearSelection()   { set({ selectedElementId: null, selectedElementIds: [], multiDragOffset: { dx: 0, dy: 0 } }); },
 
-  /** Add or remove a single element from the multi-selection (Shift+click). */
+  /** Add or remove a single element from the multi-selection (Shift+click or multiSelectMode tap). */
   addToSelection(id) {
     set((state) => {
       const ids = state.selectedElementIds.includes(id)
@@ -250,6 +261,14 @@ export const useCanvasStore = create((set, get) => ({
       selectedElementIds: ids,
       selectedElementId:  ids.length > 0 ? ids[ids.length - 1] : null,
     });
+  },
+
+  /** Update the live drag offset for the multi-select bounding box (ephemeral). */
+  setMultiDragOffset(offset) { set({ multiDragOffset: offset }); },
+
+  /** Toggle the tap-to-add-select mode (primary multi-select path on mobile). */
+  setMultiSelectMode(v) {
+    set({ multiSelectMode: v, selectedElementId: null, selectedElementIds: [], multiDragOffset: { dx: 0, dy: 0 } });
   },
 
   // ─── Page-level ───────────────────────────────────────────────────────────
@@ -274,12 +293,12 @@ export const useCanvasStore = create((set, get) => ({
   },
 
   setEditing(bool) {
-    set({ isEditing: bool, selectedElementId: null, selectedElementIds: [] });
+    set({ isEditing: bool, selectedElementId: null, selectedElementIds: [], multiSelectMode: false, multiDragOffset: { dx: 0, dy: 0 } });
   },
 
   // Legacy toggle — now requires external permission check before calling
   toggleEditing() {
-    set((state) => ({ isEditing: !state.isEditing, selectedElementId: null, selectedElementIds: [] }));
+    set((state) => ({ isEditing: !state.isEditing, selectedElementId: null, selectedElementIds: [], multiSelectMode: false, multiDragOffset: { dx: 0, dy: 0 } }));
   },
 
   // ─── Undo / Redo ──────────────────────────────────────────────────────────
