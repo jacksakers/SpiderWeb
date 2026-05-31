@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { isFirebaseConfigured, db } from '../utils/firebase';
 import { validateBlueprint } from '../utils/blueprintSchema';
 import { useHistoryStore } from '../store/historyStore';
@@ -54,6 +54,9 @@ export const useCanvasStore = create((set, get) => ({
    * Never written to Firestore.
    */
   multiDragOffset: { dx: 0, dy: 0 },
+
+  /** When true, element drags/resizes snap to the GRID_SIZE grid. */
+  snapToGrid: false,
 
   // ─── Permission helper ────────────────────────────────────────────────────
   canUserEdit(userId) {
@@ -299,6 +302,81 @@ export const useCanvasStore = create((set, get) => ({
   // Legacy toggle — now requires external permission check before calling
   toggleEditing() {
     set((state) => ({ isEditing: !state.isEditing, selectedElementId: null, selectedElementIds: [], multiSelectMode: false, multiDragOffset: { dx: 0, dy: 0 } }));
+  },
+
+  toggleSnapToGrid() {
+    set((state) => ({ snapToGrid: !state.snapToGrid }));
+  },
+
+  // ─── Alignment ────────────────────────────────────────────────────────────
+  /**
+   * Align all currently selected elements.
+   * direction: 'left' | 'right' | 'center' | 'top' | 'bottom' | 'middle'
+   *          | 'distributeH' | 'distributeV'
+   */
+  alignElements(direction) {
+    set((state) => {
+      const ids = state.selectedElementIds.length > 1
+        ? state.selectedElementIds
+        : state.selectedElementId ? [state.selectedElementId] : [];
+      if (ids.length < 2) return state;
+
+      const els = ids.map((id) => ({ id, ...state.page.elements[id] })).filter(Boolean);
+      if (els.length < 2) return state;
+
+      const getW = (el) => (typeof el.width  === 'number' ? el.width  : 100);
+      const getH = (el) => (typeof el.height === 'number' ? el.height : 40);
+
+      const minX = Math.min(...els.map((e) => e.x));
+      const maxX = Math.max(...els.map((e) => e.x + getW(e)));
+      const minY = Math.min(...els.map((e) => e.y));
+      const maxY = Math.max(...els.map((e) => e.y + getH(e)));
+      const totalW = maxX - minX;
+      const totalH = maxY - minY;
+
+      const patches = {};
+      if (direction === 'left')   els.forEach((e) => { patches[e.id] = { x: minX }; });
+      if (direction === 'right')  els.forEach((e) => { patches[e.id] = { x: maxX - getW(e) }; });
+      if (direction === 'center') els.forEach((e) => { patches[e.id] = { x: minX + totalW / 2 - getW(e) / 2 }; });
+      if (direction === 'top')    els.forEach((e) => { patches[e.id] = { y: minY }; });
+      if (direction === 'bottom') els.forEach((e) => { patches[e.id] = { y: maxY - getH(e) }; });
+      if (direction === 'middle') els.forEach((e) => { patches[e.id] = { y: minY + totalH / 2 - getH(e) / 2 }; });
+
+      if (direction === 'distributeH') {
+        const sorted = [...els].sort((a, b) => a.x - b.x);
+        const gap = (totalW - sorted.reduce((s, e) => s + getW(e), 0)) / (sorted.length - 1);
+        let cursor = minX;
+        sorted.forEach((e) => { patches[e.id] = { x: cursor }; cursor += getW(e) + gap; });
+      }
+      if (direction === 'distributeV') {
+        const sorted = [...els].sort((a, b) => a.y - b.y);
+        const gap = (totalH - sorted.reduce((s, e) => s + getH(e), 0)) / (sorted.length - 1);
+        let cursor = minY;
+        sorted.forEach((e) => { patches[e.id] = { y: cursor }; cursor += getH(e) + gap; });
+      }
+
+      const elements = { ...state.page.elements };
+      Object.entries(patches).forEach(([id, patch]) => {
+        if (elements[id]) elements[id] = { ...elements[id], ...patch };
+      });
+      useHistoryStore.getState().commit(elements);
+      return { page: { ...state.page, elements } };
+    });
+  },
+
+  // ─── Page visits ──────────────────────────────────────────────────────────
+  async recordVisit(pageId) {
+    if (!isFirebaseConfigured() || !db || !pageId || pageId === 'demo') return;
+    const sessionKey = `sw_visited_${pageId}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+    sessionStorage.setItem(sessionKey, '1');
+    try {
+      await updateDoc(doc(db, 'pages', pageId), {
+        visitCount: increment(1),
+      });
+    } catch {
+      // Non-critical — ignore errors (e.g. page doesn't exist yet)
+    }
   },
 
   // ─── Undo / Redo ──────────────────────────────────────────────────────────

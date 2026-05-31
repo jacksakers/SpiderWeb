@@ -3,9 +3,13 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { calculateScaleFactor, clientToCanvasCoords, canvasViewport } from '../../utils/canvasGeometry';
 import { createImageElement } from '../../utils/elementFactory';
 import { uploadImage } from '../../utils/imageUpload';
+import { GRID_SIZE } from '../../constants/canvas';
 import TextNode from '../elements/TextNode';
 import ImageNode from '../elements/ImageNode';
 import ShapeNode from '../elements/ShapeNode';
+import ButtonNode from '../elements/ButtonNode';
+import ListNode from '../elements/ListNode';
+import EmbedNode from '../elements/EmbedNode';
 
 /**
  * PageCanvas — the fixed-coordinate drawing surface.
@@ -16,12 +20,14 @@ import ShapeNode from '../elements/ShapeNode';
  *  - Handles drag-and-drop of image files from the desktop (editor mode)
  *  - Lasso selection: drag on empty canvas to box-select elements
  *  - MultiSelectBox: drag bounding-box to move grouped elements together
+ *  - Grid overlay: shown when snapToGrid is enabled
+ *  - Sticky element overlay: elements flagged sticky render in a fixed layer
  */
 function PageCanvas() {
   const {
     page, isEditing, clearSelection, addElement,
     selectElements, moveElements, setMultiDragOffset,
-    selectedElementIds,
+    selectedElementIds, snapToGrid,
   } = useCanvasStore();
 
   const containerRef  = useRef(null);
@@ -48,8 +54,6 @@ function PageCanvas() {
   }, []);
 
   // ─── File drag-and-drop ───────────────────────────────────────────────────
-  // Only activate when the dragged payload actually contains Files, so that
-  // dragging canvas elements around never triggers the dashed outline.
   const handleDragOver = useCallback((e) => {
     if (!isEditing) return;
     if (!e.dataTransfer.types.includes('Files')) return;
@@ -123,6 +127,33 @@ function PageCanvas() {
   const elementEntries = Object.entries(page.elements);
   const isMultiSelect  = isEditing && selectedElementIds.length > 1;
 
+  // Separate sticky vs regular elements
+  const regularEntries = elementEntries.filter(([, d]) => !d.sticky);
+  const stickyEntries  = elementEntries.filter(([, d]) => d.sticky);
+
+  function renderElement(id, data) {
+    const props = { key: id, id, data, scale };
+    if (data.type === 'text')   return <TextNode   {...props} />;
+    if (data.type === 'image')  return <ImageNode  {...props} />;
+    if (data.type === 'shape')  return <ShapeNode  {...props} />;
+    if (data.type === 'button') return <ButtonNode {...props} />;
+    if (data.type === 'list')   return <ListNode   {...props} />;
+    if (data.type === 'embed')  return <EmbedNode  {...props} />;
+    return null;
+  }
+
+  // Build the CSS background string respecting gradient and image
+  const bgStyle = {};
+  if (page.theme.backgroundGradient) {
+    bgStyle.backgroundImage = page.theme.backgroundGradient;
+  } else if (page.theme.backgroundImage) {
+    bgStyle.backgroundImage = `url(${page.theme.backgroundImage})`;
+    bgStyle.backgroundRepeat = 'repeat';
+    bgStyle.backgroundSize = 'auto';
+  } else {
+    bgStyle.backgroundColor = page.theme.backgroundColor;
+  }
+
   return (
     <div
       ref={containerRef}
@@ -134,15 +165,12 @@ function PageCanvas() {
         style={{
           width: page.theme.width,
           height: page.theme.height,
-          backgroundColor: page.theme.backgroundColor,
-          backgroundImage: page.theme.backgroundImage ? `url(${page.theme.backgroundImage})` : 'none',
-          backgroundRepeat: 'repeat',
+          ...bgStyle,
           position: 'relative',
           transformOrigin: 'top left',
           transform: `scale(${scale})`,
           marginBottom: `${(page.theme.height * scale) - page.theme.height}px`,
           outline: isDragOver && isEditing ? '3px dashed #aa3bff' : 'none',
-          // Prevent text-highlighting during lasso drag
           userSelect: isEditing ? 'none' : undefined,
         }}
         onMouseDown={handleCanvasMouseDown}
@@ -153,12 +181,21 @@ function PageCanvas() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {elementEntries.map(([id, data]) => {
-          if (data.type === 'text')  return <TextNode  key={id} id={id} data={data} scale={scale} />;
-          if (data.type === 'image') return <ImageNode key={id} id={id} data={data} scale={scale} />;
-          if (data.type === 'shape') return <ShapeNode key={id} id={id} data={data} scale={scale} />;
-          return null;
-        })}
+        {/* ── Grid overlay ──────────────────────────────────────────────── */}
+        {isEditing && snapToGrid && (
+          <div
+            style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 9998,
+              backgroundImage: `
+                linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)
+              `,
+              backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+            }}
+          />
+        )}
+
+        {regularEntries.map(([id, data]) => renderElement(id, data))}
 
         {/* Multi-select bounding-box dragger */}
         {isMultiSelect && (
@@ -189,6 +226,22 @@ function PageCanvas() {
           />
         )}
 
+        {/* Sticky elements in edit mode get a yellow dashed border */}
+        {isEditing && stickyEntries.map(([id, data]) => (
+          <div
+            key={`sticky-hint-${id}`}
+            style={{
+              position: 'absolute',
+              left: data.x, top: data.y,
+              width: data.width, height: data.height,
+              pointerEvents: 'none',
+              border: '2px dashed #f59e0b',
+              zIndex: (data.zIndex ?? 1) + 1,
+            }}
+          />
+        ))}
+        {stickyEntries.map(([id, data]) => renderElement(id, data))}
+
         {/* Empty-state hint */}
         {elementEntries.length === 0 && isEditing && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -203,12 +256,6 @@ function PageCanvas() {
 }
 
 // ─── MultiSelectBox ──────────────────────────────────────────────────────────
-/**
- * Amber dashed bounding-box rendered over all selected elements.
- * Uses pointer-capture so dragging works on both desktop and touch.
- * During drag, updates canvasStore.multiDragOffset so each selected element
- * visually follows the box in real-time.  On release, commits final positions.
- */
 const MultiSelectBox = React.memo(function MultiSelectBox({
   selectedIds, elements, scale, setMultiDragOffset, moveElements,
 }) {
@@ -248,20 +295,23 @@ const MultiSelectBox = React.memo(function MultiSelectBox({
     const dx = (e.clientX - dragRef.current.sx) / scale;
     const dy = (e.clientY - dragRef.current.sy) / scale;
     dragRef.current = null;
-
-    const patches = {};
-    validIds.forEach((id) => {
-      const el = elements[id];
-      if (el) patches[id] = { x: Math.round(el.x + dx), y: Math.round(el.y + dy) };
-    });
-    moveElements(patches);
-
     setOffset({ dx: 0, dy: 0 });
     setMultiDragOffset({ dx: 0, dy: 0 });
+    const patches = {};
+    validIds.forEach((id) => {
+      patches[id] = {
+        x: elements[id].x + dx,
+        y: elements[id].y + dy,
+      };
+    });
+    moveElements(patches);
   }
 
   return (
     <div
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
       style={{
         position: 'absolute',
         left:   bx + offset.dx,
@@ -269,33 +319,13 @@ const MultiSelectBox = React.memo(function MultiSelectBox({
         width:  bw,
         height: bh,
         border: '2px dashed #f59e0b',
-        borderRadius: 4,
-        backgroundColor: 'rgba(245,158,11,0.06)',
         cursor: 'move',
-        zIndex: 10000,
+        zIndex: 9997,
         boxSizing: 'border-box',
-        touchAction: 'none',
+        pointerEvents: 'all',
+        borderRadius: 2,
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-    >
-      <span
-        style={{
-          position: 'absolute',
-          bottom: -20,
-          left: 0,
-          fontSize: 10,
-          color: '#f59e0b',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          fontFamily: 'monospace',
-        }}
-      >
-        {validIds.length} selected · drag to move
-      </span>
-    </div>
+    />
   );
 });
 

@@ -173,6 +173,11 @@ function SocialPanel() {
         >
           {liked ? '❤️' : '🤍'} {likeCount}
         </button>
+        {typeof page.visitCount === 'number' && (
+          <span className="text-white/30 text-xs flex items-center gap-1" title="Page visits">
+            👁 {page.visitCount.toLocaleString()}
+          </span>
+        )}
         {!user && (
           <span className="text-white/30 text-xs">Sign in to interact</span>
         )}

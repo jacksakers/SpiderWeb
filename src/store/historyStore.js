@@ -10,6 +10,7 @@ import { nanoid } from 'nanoid';
  * Design choices:
  * - Max 50 snapshots to keep memory bounded.
  * - Clipboard stores a single element object (no IDs — a new ID is assigned on paste).
+ * - styleClipboard stores just the style object for Ctrl+Shift+C/V.
  * - The store is wired to canvasStore via the `commitSnapshot` helper below.
  */
 
@@ -22,7 +23,8 @@ export const useHistoryStore = create((set, get) => ({
   present: null,
   future:  [],
 
-  clipboard: null,   // { type, ...elementData } — no id field
+  clipboard:      null,   // { type, ...elementData } — no id field
+  styleClipboard: null,   // { ...styleObject } — style properties only
 
   // ─── Init ──────────────────────────────────────────────────────────────────
   init(elements) {
@@ -69,7 +71,7 @@ export const useHistoryStore = create((set, get) => ({
     return next;
   },
 
-  // ─── Clipboard ────────────────────────────────────────────────────────────
+  // ─── Element clipboard ────────────────────────────────────────────────────
   copy(element) {
     if (!element) return;
     // Strip the id — a new one is assigned on paste
@@ -87,6 +89,16 @@ export const useHistoryStore = create((set, get) => ({
       x: (clipboard.x ?? 0) + 20,
       y: (clipboard.y ?? 0) + 20,
     };
+  },
+
+  // ─── Style clipboard (Ctrl+Shift+C / Ctrl+Shift+V) ───────────────────────
+  copyStyle(element) {
+    if (!element?.style) return;
+    set({ styleClipboard: deepClone(element.style) });
+  },
+
+  pasteStyle() {
+    return get().styleClipboard ? deepClone(get().styleClipboard) : null;
   },
 }));
 

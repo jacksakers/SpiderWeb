@@ -6,11 +6,15 @@ import { useCanvasStore } from '../store/canvasStore';
  * usePageLoader — watches the active tab's pageId and calls canvasStore.loadPage
  * whenever it changes. Also syncs the browser URL hash for shareable links and
  * updates the tab title once the page title is known from Firestore.
+ *
+ * After a page loads successfully, calls recordVisit(pageId) to increment the
+ * visit counter (de-duplicated per session via sessionStorage).
  */
 export function usePageLoader() {
   const activeTab              = useTabStore((s) => s.getActiveTab());
   const updateActiveTabTitle   = useTabStore((s) => s.updateActiveTabTitle);
   const loadPage               = useCanvasStore((s) => s.loadPage);
+  const recordVisit            = useCanvasStore((s) => s.recordVisit);
   const pageStatus             = useCanvasStore((s) => s.pageStatus);
   const pageTitle              = useCanvasStore((s) => s.page?.title);
   const prevPageId             = useRef(null);
@@ -32,6 +36,12 @@ export function usePageLoader() {
     updateActiveTabTitle(pageTitle);
     document.title = `sw://${activeTab?.pageId} — SpiderWeb`;
   }, [pageStatus, pageTitle, activeTab?.pageId, updateActiveTabTitle]);
+
+  // Record a visit after the page loads (once per session per page)
+  useEffect(() => {
+    if (pageStatus !== 'loaded' || !activeTab?.pageId) return;
+    recordVisit(activeTab.pageId);
+  }, [pageStatus, activeTab?.pageId, recordVisit]);
 
   return pageStatus;
 }

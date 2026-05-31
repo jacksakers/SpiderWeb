@@ -152,8 +152,36 @@ Z-Index Management: Store a zIndex integer on every element. Provide buttons to 
 
 Security: By strictly mapping the JSON to standard React components (<p>, <img>, <a>), you inherently sanitize the input. Never use dangerouslySetInnerHTML.
 
-The Iframe Trap: You might be tempted to use actual <iframe> tags to load pages. Don't. Render the JSON directly into your Meta-Browser React state. Iframes are slow, hard to communicate with, and block drag-and-drop APIs.
+The Iframe Trap: Iframes ARE used for EmbedNode (YouTube, Spotify, SoundCloud) but are sandboxed with the `sandbox` attribute and pointer-events are blocked in edit mode so drag/resize works. Never use iframes to load internal SpiderWeb pages.
 
 Fonts: Pre-load a set of 10-15 nostalgic/clean web-safe fonts (Comic Sans, Courier New, Times New Roman, Impact, plus some modern Google Fonts). Do not allow users to upload custom font files initially (malware risk).
 
 Cursor States: To make it feel like Figma, heavily utilize CSS cursor changes (cursor-move, cursor-nwse-resize, cursor-pointer). Visual feedback is everything in a zero-code editor.
+
+8. Feature Additions (v2)
+
+A. New Element Types
+  - ButtonNode: A navigation button. Clicking in view mode navigates to `data.href` in the Meta-Browser. Configurable label, background color, text color, border-radius, font size.
+  - ListNode: A scrollable list/feed. Each item can have text, an image, and a link. Useful for "favorite links" or "recent posts" panels.
+  - EmbedNode: Embeds YouTube, Spotify, SoundCloud, or generic URLs via iframe with sandbox attribute. edit-mode overlay blocks pointer events so drag/resize works.
+
+B. Element Enhancements
+  - ImageNode: GIF play/pause toggle button appears on hover in view mode. Controlled via key-swap technique to restart the GIF.
+  - TextNode: Inline link syntax `[label](pageId)` parsed to clickable spans in view mode that navigate within the Meta-Browser.
+  - All elements: `sticky: true` flag pins an element to the viewport (not the canvas scroll) — useful for persistent nav bars or music players.
+
+C. Editor Enhancements
+  - Snap-to-Grid: Toggle aligns drag/resize to GRID_SIZE (16px) intervals using CSS grid overlay for visual feedback.
+  - Alignment Tools: Multi-select elements, then align left/center/right/top/middle/bottom or distribute horizontally/vertically.
+  - Style Copy/Paste: Ctrl+Shift+C copies the selected element's style; Ctrl+Shift+V pastes it onto another element.
+  - Ctrl+D: Duplicates the selected element with a +20px offset.
+  - Emoji Picker: Toolbar dropdown with grouped emojis (Faces, Hearts, Stars, Music, Symbols). Clicking inserts a 48px text element.
+  - Background Panel: Set page background as solid color, custom gradient (two colors + angle), preset gradients, or uploaded image.
+  - Template Gallery: Three starter templates — Fan Page, Blog Post, Link in Bio — replace canvas elements on confirmation.
+
+D. Social & Discovery
+  - Visit Counter: `visitCount` field on each page document is incremented via Firestore atomic `increment()` once per session (de-duplicated using sessionStorage). Displayed in SocialPanel likes bar alongside the like count.
+
+E. Site Grouping
+  - Pages can be grouped into "Sites" via `siteId` and `siteTitle` fields on the page document.
+  - UserPagesPanel groups owned pages by siteId under a site header, with ungrouped pages shown last.

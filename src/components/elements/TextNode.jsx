@@ -4,6 +4,24 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { useTabStore } from '../../store/tabStore';
 
 /**
+ * Parses [label](pageId) markdown-style inline links from text content.
+ * Returns an array of segments: { text, link? }.
+ */
+function parseInlineLinks(content) {
+  const segments = [];
+  const re = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    if (m.index > last) segments.push({ text: content.slice(last, m.index) });
+    segments.push({ text: m[1], link: m[2] });
+    last = m.index + m[0].length;
+  }
+  if (last < content.length) segments.push({ text: content.slice(last) });
+  return segments;
+}
+
+/**
  * TextNode — renders a single text element on the canvas.
  *
  * Edit mode rules:
@@ -13,6 +31,7 @@ import { useTabStore } from '../../store/tabStore';
  *    visually follow the amber bounding box during a group drag.
  *  - Shift+click or multiSelectMode tap adds to the selection.
  *  - Double-click or PropertyPanel textarea for inline text editing.
+ *  - In view mode, [label](pageId) syntax renders as clickable inline links.
  */
 const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
   const {
@@ -25,13 +44,11 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
 
   const isSelected      = selectedElementId === id;
   const isInGroup       = selectedElementIds.length > 1 && selectedElementIds.includes(id);
-  // Resize/drag only when this is the ONE selected element
   const isSoleSelected  = isSelected && selectedElementIds.length === 1;
 
   const [localText, setLocalText] = useState(data.content);
   const [textEditing, setTextEditing] = useState(false);
 
-  // Keep localText in sync when content is changed from the PropertyPanel textarea
   React.useEffect(() => { setLocalText(data.content); }, [data.content]);
 
   const handleDragStop = useCallback((_e, d) => {
@@ -77,9 +94,50 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
     ? `2px solid ${isInGroup ? '#f59e0b' : '#aa3bff'}`
     : '2px solid transparent';
 
-  // During a group drag, shift this element by the live offset so it moves in sync
   const liveX = isInGroup ? data.x + multiDragOffset.dx : data.x;
   const liveY = isInGroup ? data.y + multiDragOffset.dy : data.y;
+
+  // Render inline links in view mode
+  const renderContent = () => {
+    if (isEditing || !data.content) {
+      return (
+        <p style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          {data.content}
+        </p>
+      );
+    }
+    const segments = parseInlineLinks(data.content);
+    // Only render as segments if there are actual inline links
+    const hasLinks = segments.some((s) => s.link);
+    if (!hasLinks) {
+      return (
+        <p style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          {data.content}
+        </p>
+      );
+    }
+    return (
+      <p style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {segments.map((seg, i) =>
+          seg.link ? (
+            <span
+              key={i}
+              onClick={(e) => { e.stopPropagation(); navigateTo(seg.link); }}
+              style={{
+                color: '#aa3bff',
+                textDecoration: 'underline',
+                cursor: 'pointer',
+              }}
+            >
+              {seg.text}
+            </span>
+          ) : (
+            <span key={i}>{seg.text}</span>
+          )
+        )}
+      </p>
+    );
+  };
 
   const content = (
     <div
@@ -110,11 +168,7 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
             fontFamily: 'inherit', textAlign: 'inherit',
           }}
         />
-      ) : (
-        <p style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-          {data.content}
-        </p>
-      )}
+      ) : renderContent()}
     </div>
   );
 

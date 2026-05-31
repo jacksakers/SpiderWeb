@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import { useHistoryStore } from '../store/historyStore';
+import { nanoid } from 'nanoid';
 
 /**
  * useEditorShortcuts — global keyboard shortcuts for the canvas editor.
@@ -10,6 +11,9 @@ import { useHistoryStore } from '../store/historyStore';
  * Ctrl+Shift+Z      → redo
  * Ctrl+C            → copy selected element
  * Ctrl+V            → paste element (offset by 20px)
+ * Ctrl+D            → duplicate selected element (offset by 20px)
+ * Ctrl+Shift+C      → copy style of selected element
+ * Ctrl+Shift+V      → paste style onto selected element
  * Ctrl+A            → select all elements
  * Delete/Backspace  → delete selected element(s) (not when a text input is focused)
  * Escape            → clear selection
@@ -25,11 +29,12 @@ export function useEditorShortcuts() {
     selectElements,
     clearSelection,
     addElement,
+    updateElement,
     undo,
     redo,
   } = useCanvasStore();
 
-  const { copy, paste } = useHistoryStore();
+  const { copy, paste, copyStyle, pasteStyle } = useHistoryStore();
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -66,10 +71,44 @@ export function useEditorShortcuts() {
         return;
       }
 
+      if (ctrl && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        if (!selectedElementId) return;
+        const el = page.elements[selectedElementId];
+        if (el) copyStyle(el);
+        return;
+      }
+
+      if (ctrl && e.shiftKey && e.key === 'V') {
+        e.preventDefault();
+        if (!selectedElementId) return;
+        const style = pasteStyle();
+        if (style) {
+          const current = page.elements[selectedElementId]?.style ?? {};
+          updateElement(selectedElementId, { style: { ...current, ...style } });
+        }
+        return;
+      }
+
       if (ctrl && e.key === 'c') {
         if (!selectedElementId) return;
         const el = page.elements[selectedElementId];
         if (el) copy({ id: selectedElementId, ...el });
+        return;
+      }
+
+      if (ctrl && e.key === 'd') {
+        e.preventDefault();
+        if (!selectedElementId) return;
+        const el = page.elements[selectedElementId];
+        if (!el) return;
+        const { id: _id, ...data } = { id: selectedElementId, ...el };
+        addElement({
+          id: `elem_${nanoid(8)}`,
+          ...data,
+          x: (el.x ?? 0) + 20,
+          y: (el.y ?? 0) + 20,
+        });
         return;
       }
 
@@ -93,5 +132,5 @@ export function useEditorShortcuts() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isEditing, selectedElementId, selectedElementIds, page.elements, copy, paste, addElement, deleteElement, deleteSelectedElements, selectElements, clearSelection, undo, redo]);
+  }, [isEditing, selectedElementId, selectedElementIds, page.elements, copy, paste, copyStyle, pasteStyle, addElement, updateElement, deleteElement, deleteSelectedElements, selectElements, clearSelection, undo, redo]);
 }

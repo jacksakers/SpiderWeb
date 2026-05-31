@@ -1,16 +1,25 @@
 import React, { useRef, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useAuthStore } from '../../store/authStore';
-import { createTextElement, createImageElement, createShapeElement } from '../../utils/elementFactory';
+import {
+  createTextElement, createImageElement, createShapeElement,
+  createButtonElement, createListElement, createEmbedElement,
+} from '../../utils/elementFactory';
 import { uploadImage } from '../../utils/imageUpload';
 import { canvasViewport } from '../../utils/canvasGeometry';
 import {
   DEFAULT_TEXT_WIDTH,  DEFAULT_TEXT_HEIGHT,
   DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT,
   DEFAULT_SHAPE_WIDTH, DEFAULT_SHAPE_HEIGHT,
+  DEFAULT_BUTTON_WIDTH, DEFAULT_BUTTON_HEIGHT,
+  DEFAULT_LIST_WIDTH,  DEFAULT_LIST_HEIGHT,
+  DEFAULT_EMBED_WIDTH, DEFAULT_EMBED_HEIGHT,
+  EMOJI_GROUPS,
 } from '../../constants/canvas';
 import ToolbarButton from './ToolbarButton';
 import CollaboratorsModal from './CollaboratorsModal';
+import TemplateGalleryModal from './TemplateGalleryModal';
+import BackgroundPanel from './BackgroundPanel';
 
 /**
  * Returns the canvas-space coordinates for the center of the currently
@@ -28,17 +37,32 @@ function getViewportCenter(elementW, elementH) {
 /**
  * EditorToolbar — adds elements, toggles edit mode, shows save status,
  * lets the owner rename the page title, and opens the collaborators modal.
+ *
+ * Toolbar sections (edit mode):
+ *   - Page title rename
+ *   - Edit/View toggle
+ *   - Multi-select toggle
+ *   - Add elements (Text, Image, Shape, Button, List, Embed)
+ *   - Grid toggle
+ *   - Emoji picker
+ *   - Background panel
+ *   - Template gallery
+ *   - Share / Collaborators
+ *   - Save status
  */
 function EditorToolbar() {
   const {
     isEditing, setEditing, addElement, canUserEdit, page, isSaving, updatePageTitle,
-    multiSelectMode, setMultiSelectMode,
+    multiSelectMode, setMultiSelectMode, snapToGrid, toggleSnapToGrid,
   } = useCanvasStore();
   const { user } = useAuthStore();
-  const fileInputRef = useRef(null);
-  const [showShare, setShowShare] = useState(false);
+  const fileInputRef  = useRef(null);
+  const [showShare,    setShowShare]    = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showBackground, setShowBackground] = useState(false);
+  const [showEmoji,    setShowEmoji]    = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
+  const [titleDraft,   setTitleDraft]   = useState('');
 
   const canEdit = canUserEdit(user?.uid ?? null);
   const isOwner = user?.uid && user.uid === page.ownerId;
@@ -50,6 +74,18 @@ function EditorToolbar() {
   function handleAddShape(shape) {
     const pos = getViewportCenter(DEFAULT_SHAPE_WIDTH, DEFAULT_SHAPE_HEIGHT);
     addElement(createShapeElement({ ...pos, shape }));
+  }
+  function handleAddButton() {
+    const pos = getViewportCenter(DEFAULT_BUTTON_WIDTH, DEFAULT_BUTTON_HEIGHT);
+    addElement(createButtonElement(pos));
+  }
+  function handleAddList() {
+    const pos = getViewportCenter(DEFAULT_LIST_WIDTH, DEFAULT_LIST_HEIGHT);
+    addElement(createListElement(pos));
+  }
+  function handleAddEmbed() {
+    const pos = getViewportCenter(DEFAULT_EMBED_WIDTH, DEFAULT_EMBED_HEIGHT);
+    addElement(createEmbedElement(pos));
   }
 
   async function handleImageFileChange(e) {
@@ -81,10 +117,16 @@ function EditorToolbar() {
     if (e.key === 'Escape') { setEditingTitle(false); }
   }
 
+  function handleEmojiInsert(emoji) {
+    const pos = getViewportCenter(DEFAULT_TEXT_WIDTH, DEFAULT_TEXT_HEIGHT);
+    addElement(createTextElement({ ...pos, content: emoji, style: { color: '#ffffff', fontSize: '48px', fontFamily: 'Arial', textAlign: 'center' } }));
+    setShowEmoji(false);
+  }
+
   return (
     <div className="flex items-center gap-2 flex-wrap px-3 py-2 bg-black/60 border-b border-white/10 backdrop-blur min-h-[44px]">
 
-      {/* Page title — editable for owners in edit mode */}
+      {/* Page title */}
       {isEditing && isOwner ? (
         editingTitle ? (
           <input
@@ -114,8 +156,6 @@ function EditorToolbar() {
       {canEdit && (
         <>
           <div className="w-px h-5 bg-white/20 hidden sm:block" />
-
-          {/* Edit mode toggle */}
           <ToolbarButton onClick={handleEditToggle} active={isEditing} title="Toggle edit mode">
             {isEditing ? '✏️ Editing' : '👁 View'}
           </ToolbarButton>
@@ -126,7 +166,7 @@ function EditorToolbar() {
         <>
           <div className="w-px h-5 bg-white/20" />
 
-          {/* Select mode — primary multi-select path on mobile (tap to add) */}
+          {/* Multi-select mode */}
           <ToolbarButton
             onClick={() => setMultiSelectMode(!multiSelectMode)}
             active={multiSelectMode}
@@ -137,18 +177,74 @@ function EditorToolbar() {
 
           <div className="w-px h-5 bg-white/20 hidden sm:block" />
 
-          <ToolbarButton onClick={handleAddText}                       title="Add a text box" className="hidden sm:flex">T Text</ToolbarButton>
-          <ToolbarButton onClick={() => fileInputRef.current?.click()} title="Add an image"   className="hidden sm:flex">🖼 Image</ToolbarButton>
+          {/* Add elements — desktop */}
+          <ToolbarButton onClick={handleAddText}                       title="Add text"       className="hidden sm:flex">T Text</ToolbarButton>
+          <ToolbarButton onClick={() => fileInputRef.current?.click()} title="Add image"      className="hidden sm:flex">🖼 Image</ToolbarButton>
           <ToolbarButton onClick={() => handleAddShape('rectangle')}   title="Add rectangle"  className="hidden sm:flex">▭ Rect</ToolbarButton>
           <ToolbarButton onClick={() => handleAddShape('circle')}      title="Add circle"     className="hidden sm:flex">◯ Circle</ToolbarButton>
           <ToolbarButton onClick={() => handleAddShape('triangle')}    title="Add triangle"   className="hidden sm:flex">△ Tri</ToolbarButton>
+          <ToolbarButton onClick={handleAddButton}                     title="Add nav button" className="hidden sm:flex">🔘 Button</ToolbarButton>
+          <ToolbarButton onClick={handleAddList}                       title="Add list/feed"  className="hidden sm:flex">☰ List</ToolbarButton>
+          <ToolbarButton onClick={handleAddEmbed}                      title="Add embed"      className="hidden sm:flex">▶ Embed</ToolbarButton>
 
-          {/* Collapsed add menu on mobile */}
+          {/* Mobile collapsed add menu */}
           <AddMenuMobile
             onAddText={handleAddText}
             onAddImage={() => fileInputRef.current?.click()}
             onAddShape={handleAddShape}
+            onAddButton={handleAddButton}
+            onAddList={handleAddList}
+            onAddEmbed={handleAddEmbed}
           />
+
+          <div className="w-px h-5 bg-white/20 hidden sm:block" />
+
+          {/* Snap-to-grid toggle */}
+          <ToolbarButton
+            onClick={toggleSnapToGrid}
+            active={snapToGrid}
+            title="Toggle snap-to-grid"
+            className="hidden sm:flex"
+          >
+            # Grid
+          </ToolbarButton>
+
+          {/* Emoji picker */}
+          <div className="relative hidden sm:block">
+            <ToolbarButton
+              onClick={() => setShowEmoji((v) => !v)}
+              active={showEmoji}
+              title="Emoji / sticker picker"
+            >
+              😀 Emoji
+            </ToolbarButton>
+            {showEmoji && (
+              <EmojiPicker onInsert={handleEmojiInsert} onClose={() => setShowEmoji(false)} />
+            )}
+          </div>
+
+          {/* Background panel */}
+          <div className="relative hidden sm:block">
+            <ToolbarButton
+              onClick={() => setShowBackground((v) => !v)}
+              active={showBackground}
+              title="Page background"
+            >
+              🎨 BG
+            </ToolbarButton>
+            {showBackground && (
+              <BackgroundPanel onClose={() => setShowBackground(false)} />
+            )}
+          </div>
+
+          {/* Template gallery */}
+          <ToolbarButton
+            onClick={() => setShowTemplates(true)}
+            title="Browse page templates"
+            className="hidden sm:flex"
+          >
+            📋 Templates
+          </ToolbarButton>
         </>
       )}
 
@@ -173,15 +269,16 @@ function EditorToolbar() {
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
 
       {showShare && <CollaboratorsModal onClose={() => setShowShare(false)} />}
+      {showTemplates && <TemplateGalleryModal onClose={() => setShowTemplates(false)} />}
     </div>
   );
 }
 
 export default EditorToolbar;
 
-// ─── Mobile-only collapsed add menu ──────────────────────────────────────────
-function AddMenuMobile({ onAddText, onAddImage, onAddShape }) {
-  const [open, setOpen] = useState(false);
+// --- Mobile-only collapsed add menu ------------------------------------------
+function AddMenuMobile({ onAddText, onAddImage, onAddShape, onAddButton, onAddList, onAddEmbed }) {
+  const [open, setOpen] = React.useState(false);
   return (
     <div className="relative sm:hidden">
       <ToolbarButton onClick={() => setOpen((v) => !v)} active={open} title="Add element">
@@ -189,15 +286,18 @@ function AddMenuMobile({ onAddText, onAddImage, onAddShape }) {
       </ToolbarButton>
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 z-50 flex flex-col gap-1 bg-[#1a1a1a] border border-white/10 rounded-lg p-2 shadow-xl min-w-[120px]"
+          className="absolute top-full left-0 mt-1 z-50 flex flex-col gap-1 bg-[#1a1a1a] border border-white/10 rounded-lg p-2 shadow-xl min-w-[140px]"
           onPointerDown={(e) => e.stopPropagation()}
         >
           {[
-            { label: 'T Text',    fn: onAddText },
-            { label: '🖼 Image',  fn: onAddImage },
-            { label: '▭ Rect',   fn: () => onAddShape('rectangle') },
-            { label: '◯ Circle', fn: () => onAddShape('circle') },
-            { label: '△ Triangle', fn: () => onAddShape('triangle') },
+            { label: 'T Text',      fn: onAddText },
+            { label: '?? Image',    fn: onAddImage },
+            { label: '? Rect',     fn: () => onAddShape('rectangle') },
+            { label: '? Circle',   fn: () => onAddShape('circle') },
+            { label: '? Triangle', fn: () => onAddShape('triangle') },
+            { label: '?? Button',  fn: onAddButton },
+            { label: '? List',     fn: onAddList },
+            { label: '? Embed',    fn: onAddEmbed },
           ].map(({ label, fn }) => (
             <button
               key={label}
@@ -209,6 +309,47 @@ function AddMenuMobile({ onAddText, onAddImage, onAddShape }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// --- Emoji picker dropdown ----------------------------------------------------
+function EmojiPicker({ onInsert, onClose }) {
+  const [group, setGroup] = React.useState(Object.keys(EMOJI_GROUPS)[0]);
+  return (
+    <div
+      className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-lg p-3 shadow-xl w-64"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-white/50 text-xs">Emoji &amp; Stickers</span>
+        <button onClick={onClose} className="text-white/30 hover:text-white text-lg leading-none">x</button>
+      </div>
+      <div className="flex gap-1 flex-wrap mb-2">
+        {Object.keys(EMOJI_GROUPS).map((g) => (
+          <button
+            key={g}
+            onClick={() => setGroup(g)}
+            className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+              group === g ? 'bg-purple-600 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'
+            }`}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-8 gap-1">
+        {(EMOJI_GROUPS[group] ?? []).map((emoji) => (
+          <button
+            key={emoji}
+            onClick={() => onInsert(emoji)}
+            className="text-xl hover:bg-white/10 rounded p-0.5 transition-colors"
+            title={emoji}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

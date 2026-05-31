@@ -6,10 +6,15 @@ import { AVAILABLE_FONTS } from '../../constants/canvas';
  * PropertyPanel — floating side panel that appears when an element is selected.
  *
  * Shows context-relevant controls based on element type:
- *  - All elements: position, size, z-index
- *  - Text: inline content textarea (no double-click needed on mobile), color, font…
+ *  - All elements: position, size, z-index, rotation, sticky flag
+ *  - Text: content textarea, color, font, size, alignment
  *  - Image: alt text, link
- *  - Shape: background color, border radius, opacity
+ *  - Shape: fill color, border radius, opacity
+ *  - Button: label, href, colors
+ *  - List: item editor (add/remove/edit items)
+ *  - Embed: URL input
+ *
+ * Multi-select: shows alignment tools + bulk delete.
  */
 function PropertyPanel() {
   const {
@@ -22,6 +27,7 @@ function PropertyPanel() {
     bringForward,
     sendBackward,
     clearSelection,
+    alignElements,
   } = useCanvasStore();
 
   const element = selectedElementId ? page.elements[selectedElementId] : null;
@@ -53,7 +59,32 @@ function PropertyPanel() {
           <button onClick={clearSelection} className="text-white/40 hover:text-white text-xl leading-none p-1 -mr-1">×</button>
         </div>
         <p className="text-white/60 text-xs">{multiCount} elements selected</p>
-        <p className="text-white/40 text-xs">Drag any selected element to move all together. Use Delete to remove all.</p>
+
+        <Section label="Align">
+          <div className="grid grid-cols-3 gap-1">
+            {[
+              { dir: 'left',       label: '⬅ Left' },
+              { dir: 'center',     label: '↔ Center' },
+              { dir: 'right',      label: '➡ Right' },
+              { dir: 'top',        label: '⬆ Top' },
+              { dir: 'middle',     label: '↕ Middle' },
+              { dir: 'bottom',     label: '⬇ Bottom' },
+            ].map(({ dir, label }) => (
+              <button
+                key={dir}
+                onClick={() => alignElements(dir)}
+                className="px-1 py-1.5 rounded text-xs bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-1 mt-1">
+            <button onClick={() => alignElements('distributeH')} className="px-1 py-1.5 rounded text-xs bg-white/10 hover:bg-white/20">⇔ Distribute H</button>
+            <button onClick={() => alignElements('distributeV')} className="px-1 py-1.5 rounded text-xs bg-white/10 hover:bg-white/20">⇕ Distribute V</button>
+          </div>
+        </Section>
+
         <button
           onClick={deleteSelectedElements}
           className="px-3 py-2.5 rounded text-sm bg-red-900/50 hover:bg-red-700 text-red-200 transition-colors"
@@ -86,7 +117,7 @@ function PropertyPanel() {
         </button>
       </div>
 
-      {/* Text content — edit directly in the panel (great for mobile) */}
+      {/* Text content — edit directly in the panel */}
       {element.type === 'text' && (
         <Section label="Content">
           <textarea
@@ -95,14 +126,125 @@ function PropertyPanel() {
             maxLength={4000}
             rows={4}
             className="w-full bg-white/10 rounded px-2 py-1.5 text-sm text-white resize-none outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-white/30"
-            placeholder="Enter text…"
+            placeholder="Enter text… Use [label](pageId) for inline links"
           />
+          <p className="text-white/30 text-[10px]">Tip: Use [label](pageId) for inline links</p>
+        </Section>
+      )}
+
+      {/* Button label & link */}
+      {element.type === 'button' && (
+        <Section label="Button">
+          <Row label="Label">
+            <input
+              type="text"
+              value={element.label ?? ''}
+              maxLength={256}
+              onChange={(e) => update({ label: e.target.value })}
+              className="bg-white/10 rounded px-2 py-0.5 text-xs w-full"
+              placeholder="Button text"
+            />
+          </Row>
+          <Row label="Link">
+            <input
+              type="text"
+              value={element.href ?? ''}
+              maxLength={128}
+              onChange={(e) => update({ href: e.target.value })}
+              className="bg-white/10 rounded px-2 py-0.5 text-xs w-full"
+              placeholder="Page ID"
+            />
+          </Row>
+          <Row label="New Tab">
+            <input
+              type="checkbox"
+              checked={element.target === '_blank'}
+              onChange={(e) => update({ target: e.target.checked ? '_blank' : undefined })}
+            />
+          </Row>
+        </Section>
+      )}
+
+      {/* List item editor */}
+      {element.type === 'list' && (
+        <Section label="Items">
+          <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+            {(element.items ?? []).map((item, i) => (
+              <div key={i} className="flex gap-1 items-start bg-white/5 rounded p-1.5">
+                <div className="flex-1 flex flex-col gap-1">
+                  <input
+                    type="text"
+                    value={item.text}
+                    onChange={(e) => {
+                      const items = [...(element.items ?? [])];
+                      items[i] = { ...items[i], text: e.target.value };
+                      update({ items });
+                    }}
+                    className="bg-white/10 rounded px-1.5 py-0.5 text-xs w-full"
+                    placeholder="Item text"
+                  />
+                  <input
+                    type="text"
+                    value={item.link ?? ''}
+                    onChange={(e) => {
+                      const items = [...(element.items ?? [])];
+                      items[i] = { ...items[i], link: e.target.value || undefined };
+                      update({ items });
+                    }}
+                    className="bg-white/10 rounded px-1.5 py-0.5 text-[10px] w-full"
+                    placeholder="Link to page ID (optional)"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    const items = (element.items ?? []).filter((_, j) => j !== i);
+                    update({ items });
+                  }}
+                  className="text-red-400 hover:text-red-300 text-xs px-1 pt-0.5"
+                  title="Remove item"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => update({ items: [...(element.items ?? []), { text: 'New item' }] })}
+            className="mt-1 px-2 py-1.5 rounded text-xs bg-purple-800/50 hover:bg-purple-700 transition-colors"
+          >
+            + Add item
+          </button>
+        </Section>
+      )}
+
+      {/* Embed URL */}
+      {element.type === 'embed' && (
+        <Section label="Embed URL">
+          <input
+            type="text"
+            value={element.url ?? ''}
+            maxLength={1024}
+            onChange={(e) => {
+              const url = e.target.value;
+              const embedType = (() => {
+                if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
+                if (/spotify\.com/.test(url)) return 'spotify';
+                if (/soundcloud\.com/.test(url)) return 'soundcloud';
+                return 'generic';
+              })();
+              update({ url, embedType });
+            }}
+            className="bg-white/10 rounded px-2 py-1 text-xs w-full"
+            placeholder="YouTube, Spotify, SoundCloud, or any URL"
+          />
+          {element.embedType && element.embedType !== 'generic' && (
+            <p className="text-purple-400 text-[10px] capitalize mt-0.5">Detected: {element.embedType}</p>
+          )}
         </Section>
       )}
 
       {/* Position, Size & Rotation */}
       <Section label="Transform">
-        {/* 2-up grid for compact layout on both desktop and mobile */}
         <div className="grid grid-cols-2 gap-2">
           <ScrubRow label="X" value={element.x} onChange={(v) => update({ x: v })} />
           <ScrubRow label="Y" value={element.y} onChange={(v) => update({ y: v })} />
@@ -139,6 +281,21 @@ function PropertyPanel() {
         </div>
         <Row label="Z">
           <ScrubInput value={element.zIndex ?? 1} onChange={(v) => update({ zIndex: v })} min={0} max={999} />
+        </Row>
+      </Section>
+
+      {/* Sticky flag */}
+      <Section label="Behavior">
+        <Row label="Sticky">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={element.sticky ?? false}
+              onChange={(e) => update({ sticky: e.target.checked || undefined })}
+              className="accent-yellow-500"
+            />
+            <span className="text-xs text-white/60">Fix to viewport (navigation bar)</span>
+          </label>
         </Row>
       </Section>
 
@@ -193,6 +350,72 @@ function PropertyPanel() {
         </Section>
       )}
 
+      {/* Button style */}
+      {element.type === 'button' && (
+        <Section label="Style">
+          <Row label="BG">
+            <input
+              type="color"
+              value={element.style?.backgroundColor ?? '#aa3bff'}
+              onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
+              className="w-8 h-6 cursor-pointer rounded border-none bg-transparent"
+            />
+          </Row>
+          <Row label="Text">
+            <input
+              type="color"
+              value={element.style?.color ?? '#ffffff'}
+              onChange={(e) => updateStyle({ color: e.target.value })}
+              className="w-8 h-6 cursor-pointer rounded border-none bg-transparent"
+            />
+          </Row>
+          <Row label="Radius">
+            <input
+              type="range" min={0} max={50} step={1}
+              value={parseInt(element.style?.borderRadius ?? '8', 10)}
+              onChange={(e) => updateStyle({ borderRadius: `${e.target.value}px` })}
+              className="w-full accent-purple-500"
+            />
+          </Row>
+          <Row label="Font">
+            <ScrubInput
+              value={parseInt(element.style?.fontSize ?? '16', 10)}
+              onChange={(v) => updateStyle({ fontSize: `${v}px` })}
+              min={8} max={72}
+            />
+          </Row>
+        </Section>
+      )}
+
+      {/* List style */}
+      {element.type === 'list' && (
+        <Section label="Style">
+          <Row label="BG">
+            <input
+              type="color"
+              value={element.style?.backgroundColor ?? '#1e1e1e'}
+              onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
+              className="w-8 h-6 cursor-pointer rounded border-none bg-transparent"
+            />
+          </Row>
+          <Row label="Text">
+            <input
+              type="color"
+              value={element.style?.color ?? '#ffffff'}
+              onChange={(e) => updateStyle({ color: e.target.value })}
+              className="w-8 h-6 cursor-pointer rounded border-none bg-transparent"
+            />
+          </Row>
+          <Row label="Size">
+            <ScrubInput
+              value={parseInt(element.style?.fontSize ?? '14', 10)}
+              onChange={(v) => updateStyle({ fontSize: `${v}px` })}
+              min={8} max={48}
+            />
+          </Row>
+        </Section>
+      )}
+
       {/* Image-specific */}
       {element.type === 'image' && (
         <Section label="Image">
@@ -216,12 +439,11 @@ function PropertyPanel() {
               placeholder="Page ID"
             />
           </Row>
-          <Row label="Open in New Tab">
+          <Row label="New Tab">
             <input
               type="checkbox"
               checked={element.target === '_blank'}
               onChange={(e) => update({ target: e.target.checked ? '_blank' : undefined })}
-              className="bg-white/10 rounded px-2 py-0.5 text-xs"
             />
           </Row>
         </Section>
@@ -249,11 +471,22 @@ function PropertyPanel() {
               className="w-full accent-purple-500"
             />
           </Row>
+          <Row label="Radius">
+            <input
+              type="range"
+              min={0}
+              max={50}
+              step={1}
+              value={parseInt(element.style?.borderRadius ?? '0', 10)}
+              onChange={(e) => updateStyle({ borderRadius: `${e.target.value}%` })}
+              className="w-full accent-purple-500"
+            />
+          </Row>
         </Section>
       )}
 
-      {/* Link (all types) */}
-      {element.type !== 'image' && (
+      {/* Link (text + shape elements) */}
+      {(element.type === 'text' || element.type === 'shape') && (
         <Section label="Link">
           <Row label="Page">
             <input
@@ -265,12 +498,11 @@ function PropertyPanel() {
               placeholder="Page ID"
             />
           </Row>
-          <Row label="Open in New Tab">
+          <Row label="New Tab">
             <input
               type="checkbox"
               checked={element.target === '_blank'}
               onChange={(e) => update({ target: e.target.checked ? '_blank' : undefined })}
-              className="bg-white/10 rounded px-2 py-0.5 text-xs"
             />
           </Row>
         </Section>
@@ -309,10 +541,6 @@ function Row({ label, children }) {
 
 /**
  * ScrubInput — numeric input with a ↔ drag handle for desktop scrubbing.
- *
- * - Drag the ↔ handle left/right to decrement/increment (1 px per pixel moved)
- * - Click the number field to type directly
- * - Works via pointer capture so the pointer can leave the element during drag
  */
 function ScrubInput({ value, onChange, min = -Infinity, max = Infinity, step = 1 }) {
   const startRef = useRef(null);
@@ -340,7 +568,6 @@ function ScrubInput({ value, onChange, min = -Infinity, max = Infinity, step = 1
 
   return (
     <div className="flex items-center bg-white/10 rounded overflow-hidden">
-      {/* Scrub handle — desktop only */}
       <div
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -363,7 +590,6 @@ function ScrubInput({ value, onChange, min = -Infinity, max = Infinity, step = 1
   );
 }
 
-/** Compact labelled scrub input for the 2-column transform grid */
 function ScrubRow({ label, value, onChange, min, max, step }) {
   return (
     <div className="flex flex-col gap-0.5">
