@@ -1,0 +1,21 @@
+High-value / common requests
+Page groups / "Site" concept — group multiple pages into a named site (e.g. "My Band Site"), shown together in My Pages with a shared header/footer template. Essential for multi-page projects.
+Navigation button element — a pre-styled button element with a built-in link to another page ID. Solves the #1 navigation pattern without building it from scratch each time.
+Background image picker / color gradient — pick a solid color or upload a background image for the canvas. Huge for fan pages and blogs.
+Copy/paste style — Ctrl+Shift+C / Ctrl+Shift+V to copy style from one element and apply to another. Speeds up consistent styling.
+Text link within text — currently the whole TextNode is a link. Allowing a portion of text to link would unlock basic blog/nav patterns.
+
+Medium value
+Scrollable list / feed element — a box where you add multiple text+image rows that scroll. Lets users build "posts", band set lists, or FAQ sections.
+Embed/iframe element (YouTube, Spotify, SoundCloud) — paste a URL, show a preview card. Critical for music fan pages and blogs.
+Duplicate element (Ctrl+D) — already have copy/paste but a direct duplicate with offset is faster for repetitive layouts.
+Alignment tools — snap/align selected elements to left, right, center, distribute evenly.
+Page template gallery — a few starter templates ("Blog Post", "Fan Page", "Link in Bio") that pre-populate the canvas.
+
+Lower priority / future phase
+Sticky/fixed element flag — mark an element to stay in place when scrolling (for fixed navigation bars).
+Visible page grid / snap-to-grid — toggle a grid overlay with snapping (8px grid) for precise layouts.
+Emoji/sticker picker — a panel of common decorative stickers/emojis placed as text elements. Very Myspace/Geocities.
+Animated GIF frame player control — currently GIFs just play; add the ability to pause/play.
+Page password protection — set a password to view a page (Firestore rules side).
+

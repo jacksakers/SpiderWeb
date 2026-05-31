@@ -35,12 +35,14 @@ export function emptyPage(pageId = 'new', ownerId = '') {
 
 export const useCanvasStore = create((set, get) => ({
   // ─── State ────────────────────────────────────────────────────────────────
-  page:              emptyPage('demo', 'local'),
+  page:               emptyPage('demo', 'local'),
   /** 'idle' | 'loading' | 'loaded' | 'not_found' | 'error' */
-  pageStatus:        'idle',
-  isSaving:          false,
-  selectedElementId: null,
-  isEditing:         false,
+  pageStatus:         'idle',
+  isSaving:           false,
+  selectedElementId:  null,
+  /** Array of IDs for multi-select (always a superset of selectedElementId) */
+  selectedElementIds: [],
+  isEditing:          false,
 
   // ─── Permission helper ────────────────────────────────────────────────────
   canUserEdit(userId) {
@@ -57,7 +59,7 @@ export const useCanvasStore = create((set, get) => ({
   async loadPage(pageId) {
     if (get().page.pageId === pageId && get().pageStatus === 'loaded') return;
 
-    set({ pageStatus: 'loading', isEditing: false, selectedElementId: null });
+    set({ pageStatus: 'loading', isEditing: false, selectedElementId: null, selectedElementIds: [] });
 
     if (!isFirebaseConfigured() || !db) {
       // Offline / Phase 1 mode — just show a blank demo page
@@ -177,8 +179,39 @@ export const useCanvasStore = create((set, get) => ({
       useHistoryStore.getState().commit(elements);
       return {
         page: { ...state.page, elements },
-        selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
+        selectedElementId:  state.selectedElementId  === id ? null : state.selectedElementId,
+        selectedElementIds: state.selectedElementIds.filter((sid) => sid !== id),
       };
+    });
+  },
+
+  /** Delete all currently selected elements (single or multi). */
+  deleteSelectedElements() {
+    set((state) => {
+      const ids = state.selectedElementIds.length > 0
+        ? state.selectedElementIds
+        : state.selectedElementId ? [state.selectedElementId] : [];
+      if (ids.length === 0) return state;
+      const elements = { ...state.page.elements };
+      ids.forEach((id) => { delete elements[id]; });
+      useHistoryStore.getState().commit(elements);
+      return {
+        page: { ...state.page, elements },
+        selectedElementId:  null,
+        selectedElementIds: [],
+      };
+    });
+  },
+
+  /** Commit position/size patches for multiple elements in a single history entry. */
+  moveElements(patches) {
+    set((state) => {
+      const elements = { ...state.page.elements };
+      Object.entries(patches).forEach(([id, patch]) => {
+        if (elements[id]) elements[id] = { ...elements[id], ...patch };
+      });
+      useHistoryStore.getState().commit(elements);
+      return { page: { ...state.page, elements } };
     });
   },
 
@@ -195,8 +228,29 @@ export const useCanvasStore = create((set, get) => ({
   },
 
   // ─── Selection ────────────────────────────────────────────────────────────
-  selectElement(id)  { set({ selectedElementId: id }); },
-  clearSelection()   { set({ selectedElementId: null }); },
+  selectElement(id)  { set({ selectedElementId: id, selectedElementIds: [id] }); },
+  clearSelection()   { set({ selectedElementId: null, selectedElementIds: [] }); },
+
+  /** Add or remove a single element from the multi-selection (Shift+click). */
+  addToSelection(id) {
+    set((state) => {
+      const ids = state.selectedElementIds.includes(id)
+        ? state.selectedElementIds.filter((i) => i !== id)
+        : [...state.selectedElementIds, id];
+      return {
+        selectedElementIds: ids,
+        selectedElementId:  ids.length > 0 ? ids[ids.length - 1] : null,
+      };
+    });
+  },
+
+  /** Replace the entire selection with the given array of IDs (lasso). */
+  selectElements(ids) {
+    set({
+      selectedElementIds: ids,
+      selectedElementId:  ids.length > 0 ? ids[ids.length - 1] : null,
+    });
+  },
 
   // ─── Page-level ───────────────────────────────────────────────────────────
   updateTheme(patch) {
@@ -220,12 +274,12 @@ export const useCanvasStore = create((set, get) => ({
   },
 
   setEditing(bool) {
-    set({ isEditing: bool, selectedElementId: null });
+    set({ isEditing: bool, selectedElementId: null, selectedElementIds: [] });
   },
 
   // Legacy toggle — now requires external permission check before calling
   toggleEditing() {
-    set((state) => ({ isEditing: !state.isEditing, selectedElementId: null }));
+    set((state) => ({ isEditing: !state.isEditing, selectedElementId: null, selectedElementIds: [] }));
   },
 
   // ─── Undo / Redo ──────────────────────────────────────────────────────────

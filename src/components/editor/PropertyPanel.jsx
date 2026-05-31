@@ -7,24 +7,25 @@ import { AVAILABLE_FONTS } from '../../constants/canvas';
  *
  * Shows context-relevant controls based on element type:
  *  - All elements: position, size, z-index
- *  - Text: content (handled inline), color, font size, font family, alignment
- *  - Image: alt text, link (href to another page ID)
+ *  - Text: inline content textarea (no double-click needed on mobile), color, font…
+ *  - Image: alt text, link
  *  - Shape: background color, border radius, opacity
- *
- * Phase 2 additions: link autocomplete against known page IDs in Firestore.
  */
 function PropertyPanel() {
   const {
     page,
     selectedElementId,
+    selectedElementIds,
     updateElement,
     deleteElement,
+    deleteSelectedElements,
     bringForward,
     sendBackward,
     clearSelection,
   } = useCanvasStore();
 
   const element = selectedElementId ? page.elements[selectedElementId] : null;
+  const multiCount = selectedElementIds.length;
 
   const update = useCallback(
     (patch) => {
@@ -42,6 +43,26 @@ function PropertyPanel() {
     },
     [selectedElementId, page.elements, updateElement]
   );
+
+  // ─── Multi-select summary panel ────────────────────────────────────────────
+  if (multiCount > 1) {
+    return (
+      <div className="w-full bg-black/70 p-3 flex flex-col gap-3 text-white text-sm backdrop-blur">
+        <div className="flex items-center justify-between">
+          <span className="text-xs uppercase tracking-widest text-white/40">Multi-select</span>
+          <button onClick={clearSelection} className="text-white/40 hover:text-white text-xl leading-none p-1 -mr-1">×</button>
+        </div>
+        <p className="text-white/60 text-xs">{multiCount} elements selected</p>
+        <p className="text-white/40 text-xs">Drag any selected element to move all together. Use Delete to remove all.</p>
+        <button
+          onClick={deleteSelectedElements}
+          className="px-3 py-2.5 rounded text-sm bg-red-900/50 hover:bg-red-700 text-red-200 transition-colors"
+        >
+          🗑 Delete {multiCount} elements
+        </button>
+      </div>
+    );
+  }
 
   if (!element) return (
     <div className="p-4 text-white/20 text-xs text-center">
@@ -64,6 +85,20 @@ function PropertyPanel() {
           ×
         </button>
       </div>
+
+      {/* Text content — edit directly in the panel (great for mobile) */}
+      {element.type === 'text' && (
+        <Section label="Content">
+          <textarea
+            value={element.content ?? ''}
+            onChange={(e) => update({ content: e.target.value })}
+            maxLength={4000}
+            rows={4}
+            className="w-full bg-white/10 rounded px-2 py-1.5 text-sm text-white resize-none outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-white/30"
+            placeholder="Enter text…"
+          />
+        </Section>
+      )}
 
       {/* Position, Size & Rotation */}
       <Section label="Transform">

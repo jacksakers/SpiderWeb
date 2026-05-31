@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTabStore } from '../../store/tabStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useAuthStore } from '../../store/authStore';
 import { usePageLoader } from '../../hooks/usePageLoader';
 import { useSavePage } from '../../hooks/useSavePage';
 import { useEditorShortcuts } from '../../hooks/useEditorShortcuts';
+import { canvasViewport } from '../../utils/canvasGeometry';
 import TabBar from './TabBar';
 import AddressBar from './AddressBar';
 import EditorToolbar from '../editor/EditorToolbar';
@@ -132,7 +133,7 @@ function MobileBottomSheet({ open, onClose, activeTab, onSelectTab, showProperti
 
 function MetaBrowser() {
   const { initActiveTab, getActiveTab } = useTabStore();
-  const { isEditing, selectedElementId } = useCanvasStore();
+  const { isEditing, selectedElementId, selectedElementIds } = useCanvasStore();
   const activeTab = getActiveTab();
   const isMobile = useIsMobile();
 
@@ -146,7 +147,7 @@ function MetaBrowser() {
   useSavePage();
   useEditorShortcuts();
 
-  const showProperties = isEditing && selectedElementId !== null;
+  const showProperties = isEditing && (selectedElementId !== null || selectedElementIds.length > 1);
 
   // Auto-switch to Properties when an element is selected
   useEffect(() => {
@@ -201,7 +202,10 @@ function MetaBrowser() {
         {isNotFound && <PageNotFoundPrompt pageId={activeTab?.pageId ?? ''} />}
 
         {!isLoading && !isNotFound && (
-          <div className="flex-1 overflow-auto min-w-0">
+          <div
+            className="flex-1 overflow-auto min-w-0"
+            ref={(el) => { canvasViewport.scrollEl = el; }}
+          >
             <PageCanvas />
           </div>
         )}

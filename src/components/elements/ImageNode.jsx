@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Rnd } from 'react-rnd';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useTabStore } from '../../store/tabStore';
@@ -7,18 +7,40 @@ import { useTabStore } from '../../store/tabStore';
  * ImageNode — renders an image/GIF element on the canvas.
  *
  * - Clicking an image with an href navigates the Meta-Browser (intercepted link)
+ * - Shift+click adds to multi-selection
  * - In editor mode: draggable/resizable via react-rnd
- * - Phase 2: src will be a Firebase Storage URL
  */
 const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
-  const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
-  const navigateTo = useTabStore((s) => s.navigateTo);
+  const {
+    updateElement, selectElement, addToSelection, moveElements,
+    selectedElementId, selectedElementIds, isEditing, commitElement,
+  } = useCanvasStore();
+  const navigateTo   = useTabStore((s) => s.navigateTo);
   const openInNewTab = useTabStore((s) => s.openInNewTab);
-  const isSelected = selectedElementId === id;
+  const isSelected      = selectedElementId === id;
+  const isMultiSelected = selectedElementIds.includes(id);
+  const dragStartRef = useRef(null);
+
+  const handleDragStart = useCallback((_e, d) => {
+    dragStartRef.current = { x: d.x, y: d.y };
+  }, []);
 
   const handleDragStop = useCallback((_e, d) => {
-    commitElement(id, { x: d.x, y: d.y });
-  }, [id, commitElement]);
+    const { selectedElementIds: ids, page } = useCanvasStore.getState();
+    if (ids.length > 1 && ids.includes(id)) {
+      const dx = d.x - (dragStartRef.current?.x ?? data.x);
+      const dy = d.y - (dragStartRef.current?.y ?? data.y);
+      const patches = {};
+      ids.forEach((sid) => {
+        const el = page.elements[sid];
+        if (el) patches[sid] = { x: el.x + dx, y: el.y + dy };
+      });
+      moveElements(patches);
+    } else {
+      commitElement(id, { x: d.x, y: d.y });
+    }
+    dragStartRef.current = null;
+  }, [id, data.x, data.y, commitElement, moveElements]);
 
   const handleResizeStop = useCallback((_e, _dir, ref, _delta, pos) => {
     commitElement(id, {
@@ -41,11 +63,15 @@ const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
       }
       return;
     }
+    if (e.shiftKey && isEditing) {
+      addToSelection(id);
+      return;
+    }
     selectElement(id);
-  }, [id, isEditing, data.href, data.target, data.title, selectElement, navigateTo, openInNewTab]);
+  }, [id, isEditing, data.href, data.target, data.title, selectElement, addToSelection, navigateTo, openInNewTab]);
 
-  const selectionRing = isSelected && isEditing
-    ? '2px solid #aa3bff'
+  const selectionRing = (isSelected || isMultiSelected) && isEditing
+    ? `2px solid ${isMultiSelected && selectedElementIds.length > 1 ? '#f59e0b' : '#aa3bff'}`
     : '2px solid transparent';
 
   const imgEl = (
@@ -94,9 +120,10 @@ const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
     <Rnd
       size={{ width: data.width, height: data.height }}
       position={{ x: data.x, y: data.y }}
+      onDragStart={handleDragStart}
       onDragStop={handleDragStop}
       onResizeStop={handleResizeStop}
-      disableDragging={!isSelected}
+      disableDragging={!isSelected && !isMultiSelected}
       style={{ zIndex: data.zIndex ?? 1 }}
       scale={scale}
       bounds="parent"

@@ -5,19 +5,25 @@ import { useHistoryStore } from '../store/historyStore';
 /**
  * useEditorShortcuts — global keyboard shortcuts for the canvas editor.
  *
- * Ctrl+Z        → undo
- * Ctrl+Y        → redo
- * Ctrl+Shift+Z  → redo
- * Ctrl+C        → copy selected element
- * Ctrl+V        → paste element (offset by 20px)
- * Delete/Backspace → delete selected element (not when a text input is focused)
+ * Ctrl+Z            → undo
+ * Ctrl+Y            → redo
+ * Ctrl+Shift+Z      → redo
+ * Ctrl+C            → copy selected element
+ * Ctrl+V            → paste element (offset by 20px)
+ * Ctrl+A            → select all elements
+ * Delete/Backspace  → delete selected element(s) (not when a text input is focused)
+ * Escape            → clear selection
  */
 export function useEditorShortcuts() {
   const {
     isEditing,
     selectedElementId,
+    selectedElementIds,
     page,
     deleteElement,
+    deleteSelectedElements,
+    selectElements,
+    clearSelection,
     addElement,
     undo,
     redo,
@@ -47,12 +53,22 @@ export function useEditorShortcuts() {
         return;
       }
 
-      if (!isEditing) return;  // copy/paste/delete only in edit mode
+      if (e.key === 'Escape') {
+        clearSelection();
+        return;
+      }
+
+      if (!isEditing) return;  // copy/paste/delete/select-all only in edit mode
+
+      if (ctrl && e.key === 'a') {
+        e.preventDefault();
+        selectElements(Object.keys(page.elements));
+        return;
+      }
 
       if (ctrl && e.key === 'c') {
         if (!selectedElementId) return;
-        const elements = page.elements;
-        const el = elements[selectedElementId];
+        const el = page.elements[selectedElementId];
         if (el) copy({ id: selectedElementId, ...el });
         return;
       }
@@ -64,13 +80,18 @@ export function useEditorShortcuts() {
         return;
       }
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
-        e.preventDefault();
-        deleteElement(selectedElementId);
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedElementIds.length > 1) {
+          e.preventDefault();
+          deleteSelectedElements();
+        } else if (selectedElementId) {
+          e.preventDefault();
+          deleteElement(selectedElementId);
+        }
       }
     }
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isEditing, selectedElementId, page.elements, copy, paste, addElement, deleteElement, undo, redo]);
+  }, [isEditing, selectedElementId, selectedElementIds, page.elements, copy, paste, addElement, deleteElement, deleteSelectedElements, selectElements, clearSelection, undo, redo]);
 }

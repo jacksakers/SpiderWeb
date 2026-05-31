@@ -1,6 +1,18 @@
 import { MAX_CANVAS_WIDTH } from '../constants/canvas';
 
 /**
+ * Shared mutable object so any module can read the current canvas scale and
+ * the scrollable viewport container without prop-drilling.
+ *
+ * - PageCanvas sets `canvasViewport.scale` on every ResizeObserver tick.
+ * - MetaBrowser sets `canvasViewport.scrollEl` when the scrollable div mounts.
+ */
+export const canvasViewport = {
+  scale:     1,
+  scrollEl:  null, // HTMLElement | null
+};
+
+/**
  * Calculates the CSS scale factor so the fixed-width canvas fits inside
  * the current viewport on any screen size (mobile, tablet, desktop).
  *

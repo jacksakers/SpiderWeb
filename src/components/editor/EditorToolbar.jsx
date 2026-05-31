@@ -3,8 +3,27 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { useAuthStore } from '../../store/authStore';
 import { createTextElement, createImageElement, createShapeElement } from '../../utils/elementFactory';
 import { uploadImage } from '../../utils/imageUpload';
+import { canvasViewport } from '../../utils/canvasGeometry';
+import {
+  DEFAULT_TEXT_WIDTH,  DEFAULT_TEXT_HEIGHT,
+  DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT,
+  DEFAULT_SHAPE_WIDTH, DEFAULT_SHAPE_HEIGHT,
+} from '../../constants/canvas';
 import ToolbarButton from './ToolbarButton';
 import CollaboratorsModal from './CollaboratorsModal';
+
+/**
+ * Returns the canvas-space coordinates for the center of the currently
+ * visible viewport, offset so the new element is centred there.
+ */
+function getViewportCenter(elementW, elementH) {
+  const { scale, scrollEl } = canvasViewport;
+  if (!scrollEl || scale <= 0) return { x: 100, y: 100 };
+  const { scrollLeft, scrollTop, clientWidth, clientHeight } = scrollEl;
+  const x = scrollLeft / scale + clientWidth  / (2 * scale) - elementW / 2;
+  const y = scrollTop  / scale + clientHeight / (2 * scale) - elementH / 2;
+  return { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)) };
+}
 
 /**
  * EditorToolbar — adds elements, toggles edit mode, shows save status,
@@ -21,14 +40,21 @@ function EditorToolbar() {
   const canEdit = canUserEdit(user?.uid ?? null);
   const isOwner = user?.uid && user.uid === page.ownerId;
 
-  function handleAddText()  { addElement(createTextElement({ x: 80, y: 80 })); }
-  function handleAddShape(shape) { addElement(createShapeElement({ x: 100, y: 100, shape })); }
+  function handleAddText()  {
+    const pos = getViewportCenter(DEFAULT_TEXT_WIDTH, DEFAULT_TEXT_HEIGHT);
+    addElement(createTextElement(pos));
+  }
+  function handleAddShape(shape) {
+    const pos = getViewportCenter(DEFAULT_SHAPE_WIDTH, DEFAULT_SHAPE_HEIGHT);
+    addElement(createShapeElement({ ...pos, shape }));
+  }
 
   async function handleImageFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     const src = await uploadImage(file, page.pageId);
-    addElement(createImageElement({ x: 100, y: 100, src, alt: file.name }));
+    const pos = getViewportCenter(DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT);
+    addElement(createImageElement({ ...pos, src, alt: file.name }));
     e.target.value = '';
   }
 

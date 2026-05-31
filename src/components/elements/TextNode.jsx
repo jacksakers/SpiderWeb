@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Rnd } from 'react-rnd';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useTabStore } from '../../store/tabStore';
@@ -8,21 +8,47 @@ import { useTabStore } from '../../store/tabStore';
  *
  * - Read-only in renderer mode (isEditing=false)
  * - Draggable/resizable in editor mode via react-rnd
- * - Double-click to enter inline text editing
+ * - Double-click OR property-panel textarea for inline text editing
+ * - Shift+click adds to multi-selection
  * - All text rendered as plain string children (never innerHTML) per security rules
  */
 const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
-  const { updateElement, selectElement, selectedElementId, isEditing, commitElement } = useCanvasStore();
-  const navigateTo = useTabStore((s) => s.navigateTo);
+  const {
+    updateElement, selectElement, addToSelection, moveElements,
+    selectedElementId, selectedElementIds, isEditing, commitElement,
+  } = useCanvasStore();
+  const navigateTo   = useTabStore((s) => s.navigateTo);
   const openInNewTab = useTabStore((s) => s.openInNewTab);
-  const isSelected = selectedElementId === id;
+  const isSelected      = selectedElementId === id;
+  const isMultiSelected = selectedElementIds.includes(id);
 
   const [localText, setLocalText] = useState(data.content);
   const [textEditing, setTextEditing] = useState(false);
+  const dragStartRef = useRef(null);
+
+  // Keep localText in sync when content is changed from the PropertyPanel textarea
+  React.useEffect(() => { setLocalText(data.content); }, [data.content]);
+
+  const handleDragStart = useCallback((_e, d) => {
+    dragStartRef.current = { x: d.x, y: d.y };
+  }, []);
 
   const handleDragStop = useCallback((_e, d) => {
-    commitElement(id, { x: d.x, y: d.y });
-  }, [id, commitElement]);
+    const { selectedElementIds: ids, page } = useCanvasStore.getState();
+    if (ids.length > 1 && ids.includes(id)) {
+      const dx = d.x - (dragStartRef.current?.x ?? data.x);
+      const dy = d.y - (dragStartRef.current?.y ?? data.y);
+      const patches = {};
+      ids.forEach((sid) => {
+        const el = page.elements[sid];
+        if (el) patches[sid] = { x: el.x + dx, y: el.y + dy };
+      });
+      moveElements(patches);
+    } else {
+      commitElement(id, { x: d.x, y: d.y });
+    }
+    dragStartRef.current = null;
+  }, [id, data.x, data.y, commitElement, moveElements]);
 
   const handleResizeStop = useCallback((_e, _dir, ref, _delta, pos) => {
     commitElement(id, {
@@ -44,8 +70,12 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
       }
       return;
     }
+    if (e.shiftKey && isEditing) {
+      addToSelection(id);
+      return;
+    }
     selectElement(id);
-  }, [id, isEditing, data.href, data.target, data.title, selectElement, navigateTo, openInNewTab]);
+  }, [id, isEditing, data.href, data.target, data.title, selectElement, addToSelection, navigateTo, openInNewTab]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!isEditing) return;
@@ -58,8 +88,8 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
     updateElement(id, { content: localText });
   }, [id, localText, updateElement]);
 
-  const selectionRing = isSelected && isEditing
-    ? '2px solid #aa3bff'
+  const selectionRing = (isSelected || isMultiSelected) && isEditing
+    ? `2px solid ${isMultiSelected && selectedElementIds.length > 1 ? '#f59e0b' : '#aa3bff'}`
     : '2px solid transparent';
 
   const content = (
@@ -128,13 +158,13 @@ const TextNode = React.memo(function TextNode({ id, data, scale = 1 }) {
     <Rnd
       size={{ width: data.width, height: data.height }}
       position={{ x: data.x, y: data.y }}
+      onDragStart={handleDragStart}
       onDragStop={handleDragStop}
       onResizeStop={handleResizeStop}
-      disableDragging={!isSelected}
+      disableDragging={textEditing || (!isSelected && !isMultiSelected)}
       style={{ zIndex: data.zIndex ?? 1 }}
       scale={scale}
       bounds="parent"
-      disableDragging={textEditing}
     >
       {content}
     </Rnd>
