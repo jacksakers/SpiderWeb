@@ -34,6 +34,9 @@ function PageCanvas() {
   const canvasRef     = useRef(null);
   const [scale, setScale]       = useState(1);
   const [isDragOver, setIsDragOver] = useState(false);
+  // Track scroll position so sticky elements can be offset to appear viewport-fixed
+  const [scrollTop,  setScrollTop]  = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   // ─── Lasso selection state ─────────────────────────────────────────────────
   const [lasso, setLasso] = useState(null); // { x1,y1,x2,y2 } in canvas px
@@ -51,6 +54,37 @@ function PageCanvas() {
     const ro = new ResizeObserver(updateScale);
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
+  }, []);
+
+  // ─── Track scroll for sticky elements ─────────────────────────────────────
+  useEffect(() => {
+    // canvasViewport.scrollEl is set by MetaBrowser after mount, so we poll briefly
+    let el = canvasViewport.scrollEl;
+    let cleanupFn = () => {};
+    function attach(scrollEl) {
+      function onScroll() {
+        setScrollTop(scrollEl.scrollTop);
+        setScrollLeft(scrollEl.scrollLeft);
+      }
+      scrollEl.addEventListener('scroll', onScroll, { passive: true });
+      onScroll(); // sync initial position
+      cleanupFn = () => scrollEl.removeEventListener('scroll', onScroll);
+    }
+    if (el) {
+      attach(el);
+    } else {
+      // scrollEl set asynchronously; retry a few times
+      let attempts = 0;
+      const timer = setInterval(() => {
+        el = canvasViewport.scrollEl;
+        if (el || attempts++ > 20) {
+          clearInterval(timer);
+          if (el) attach(el);
+        }
+      }, 100);
+      cleanupFn = () => clearInterval(timer);
+    }
+    return () => cleanupFn();
   }, []);
 
   // ─── File drag-and-drop ───────────────────────────────────────────────────
@@ -132,13 +166,13 @@ function PageCanvas() {
   const stickyEntries  = elementEntries.filter(([, d]) => d.sticky);
 
   function renderElement(id, data) {
-    const props = { key: id, id, data, scale };
-    if (data.type === 'text')   return <TextNode   {...props} />;
-    if (data.type === 'image')  return <ImageNode  {...props} />;
-    if (data.type === 'shape')  return <ShapeNode  {...props} />;
-    if (data.type === 'button') return <ButtonNode {...props} />;
-    if (data.type === 'list')   return <ListNode   {...props} />;
-    if (data.type === 'embed')  return <EmbedNode  {...props} />;
+    const props = { id, data, scale };
+    if (data.type === 'text')   return <TextNode   key={id} {...props} />;
+    if (data.type === 'image')  return <ImageNode  key={id} {...props} />;
+    if (data.type === 'shape')  return <ShapeNode  key={id} {...props} />;
+    if (data.type === 'button') return <ButtonNode key={id} {...props} />;
+    if (data.type === 'list')   return <ListNode   key={id} {...props} />;
+    if (data.type === 'embed')  return <EmbedNode  key={id} {...props} />;
     return null;
   }
 
@@ -226,7 +260,7 @@ function PageCanvas() {
           />
         )}
 
-        {/* Sticky elements in edit mode get a yellow dashed border */}
+        {/* Sticky elements in edit mode get a yellow dashed border hint */}
         {isEditing && stickyEntries.map(([id, data]) => (
           <div
             key={`sticky-hint-${id}`}
@@ -240,7 +274,19 @@ function PageCanvas() {
             }}
           />
         ))}
-        {stickyEntries.map(([id, data]) => renderElement(id, data))}
+        {/* Sticky elements: in edit mode render at canvas position (easy to drag/resize);
+            in view mode offset by scroll so they appear viewport-fixed */}
+        {stickyEntries.map(([id, data]) => {
+          if (isEditing) return renderElement(id, data);
+          // Scroll-compensate: move element down by scrollTop/scale so it stays
+          // at data.y pixels from the top of the visible viewport area
+          const stickyData = {
+            ...data,
+            y: data.y + scrollTop  / scale,
+            x: data.x + scrollLeft / scale,
+          };
+          return renderElement(id, stickyData);
+        })}
 
         {/* Empty-state hint */}
         {elementEntries.length === 0 && isEditing && (

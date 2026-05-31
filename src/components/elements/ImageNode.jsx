@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { Rnd } from 'react-rnd';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useTabStore } from '../../store/tabStore';
@@ -33,7 +33,9 @@ const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
   // GIF player state
   const [gifPlaying, setGifPlaying] = useState(true);
   const [gifKey,     setGifKey]     = useState(0);
-  const [hovered,    setHovered]    = useState(false);
+  // refs for canvas-based pause capture
+  const imgRef       = useRef(null);
+  const gifCanvasRef = useRef(null);
 
   const handleDragStop = useCallback((_e, d) => {
     commitElement(id, { x: d.x, y: d.y });
@@ -66,10 +68,17 @@ const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
   const toggleGif = useCallback((e) => {
     e.stopPropagation();
     if (gifPlaying) {
+      // Capture the current GIF frame onto a canvas element so it appears "frozen"
+      const img = imgRef.current;
+      const cvs = gifCanvasRef.current;
+      if (img && cvs) {
+        cvs.width  = img.naturalWidth  || img.clientWidth  || 200;
+        cvs.height = img.naturalHeight || img.clientHeight || 200;
+        try { cvs.getContext('2d').drawImage(img, 0, 0, cvs.width, cvs.height); } catch (_) {}
+      }
       setGifPlaying(false);
     } else {
-      // Force GIF to restart by changing the key
-      setGifKey((k) => k + 1);
+      setGifKey((k) => k + 1); // restart GIF from frame 0
       setGifPlaying(true);
     }
   }, [gifPlaying]);
@@ -97,33 +106,44 @@ const ImageNode = React.memo(function ImageNode({ id, data, scale = 1 }) {
         ...data.style,
       }}
       onClick={handleClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
+      {/* Live GIF (shown when playing) */}
       <img
+        ref={imgRef}
         key={gifKey}
-        src={gifPlaying ? data.src : `${data.src}#paused`}
+        src={data.src}
         alt={data.alt ?? ''}
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
         style={{
-          width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+          width: '100%', height: '100%', objectFit: 'cover', display: gifPlaying ? 'block' : 'none',
           userSelect: 'none', pointerEvents: 'none',
-          // When "paused", freeze via animation-play-state (only works for CSS animations, not GIFs,
-          // but the key-swap trick above restarts the GIF when toggled back to playing)
         }}
         onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
       />
 
-      {/* GIF play/pause overlay — only in view mode, on hover */}
-      {gif && !isEditing && hovered && (
+      {/* Frozen frame canvas (shown when paused) */}
+      {gif && (
+        <canvas
+          ref={gifCanvasRef}
+          style={{
+            width: '100%', height: '100%', objectFit: 'cover',
+            display: gifPlaying ? 'none' : 'block',
+            userSelect: 'none', pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* GIF play/pause button — visible in view mode; always shown so it works on touch */}
+      {gif && !isEditing && (
         <button
           onClick={toggleGif}
           style={{
             position: 'absolute', bottom: 6, right: 6,
-            background: 'rgba(0,0,0,0.6)', color: '#fff',
-            border: 'none', borderRadius: 4, padding: '2px 8px',
-            fontSize: 12, cursor: 'pointer', zIndex: 10,
+            background: 'rgba(0,0,0,0.65)', color: '#fff',
+            border: 'none', borderRadius: 4, padding: '3px 9px',
+            fontSize: 13, cursor: 'pointer', zIndex: 10,
+            opacity: 0.85,
           }}
           title={gifPlaying ? 'Pause GIF' : 'Play GIF'}
         >
