@@ -91,12 +91,15 @@ function getViewportCenter(elementW, elementH) {
  */
 function EditorToolbar() {
   const {
-    isEditing, setEditing, addElement, canUserEdit, page, isSaving, updatePageTitle,
+    isEditing, setEditing, addElement, addElements, canUserEdit, page, isSaving, updatePageTitle,
     multiSelectMode, setMultiSelectMode, snapToGrid, toggleSnapToGrid,
     undo, redo,
   } = useCanvasStore();
-  const canUndo = useHistoryStore((s) => s.past.length > 0);
-  const canRedo = useHistoryStore((s) => s.future.length > 0);
+  const canUndo     = useHistoryStore((s) => s.past.length > 0);
+  const canRedo     = useHistoryStore((s) => s.future.length > 0);
+  const clipboard   = useHistoryStore((s) => s.clipboard);
+  const paste       = useHistoryStore((s) => s.paste);
+  const hasClipboard = clipboard && clipboard.length > 0;
   const { user } = useAuthStore();
   const fileInputRef    = useRef(null);
   const emojiButtonRef  = useRef(null);
@@ -218,6 +221,21 @@ function EditorToolbar() {
           >
             ◻ Select
           </ToolbarButton>
+
+          {/* Paste — visible on all breakpoints when clipboard is non-empty */}
+          {hasClipboard && (
+            <ToolbarButton
+              onClick={() => {
+                const els = paste();
+                if (!els) return;
+                if (els.length === 1) addElement(els[0]);
+                else addElements(els);
+              }}
+              title={`Paste ${clipboard.length > 1 ? `${clipboard.length} elements` : 'element'} (Ctrl+V)`}
+            >
+              📋 Paste
+            </ToolbarButton>
+          )}
 
           <div className="w-px h-5 bg-white/20 hidden sm:block" />
 

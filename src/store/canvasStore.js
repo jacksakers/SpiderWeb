@@ -217,6 +217,22 @@ export const useCanvasStore = create((set, get) => ({
     });
   },
 
+  /** Add multiple elements to the canvas in a single history commit and select them all. */
+  addElements(elements) {
+    set((state) => {
+      const newElements = { ...state.page.elements };
+      elements.forEach(({ id, ...rest }) => {
+        newElements[id] = rest;
+      });
+      useHistoryStore.getState().commit(newElements);
+      return {
+        page: { ...state.page, elements: newElements },
+        selectedElementIds: elements.map((e) => e.id),
+        selectedElementId:  elements[elements.length - 1]?.id ?? null,
+      };
+    });
+  },
+
   /** Commit position/size patches for multiple elements in a single history entry. */
   moveElements(patches) {
     set((state) => {

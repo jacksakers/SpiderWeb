@@ -72,23 +72,37 @@ export const useHistoryStore = create((set, get) => ({
   },
 
   // ─── Element clipboard ────────────────────────────────────────────────────
-  copy(element) {
-    if (!element) return;
-    // Strip the id — a new one is assigned on paste
-    const { id: _id, ...data } = element;
-    set({ clipboard: deepClone(data) });
+  /**
+   * Copy one or many elements into the clipboard.
+   * Pass a single element object or an array of element objects (each with an `id` field).
+   * IDs are stripped — fresh ones are assigned on paste.
+   */
+  copy(elementOrElements) {
+    if (!elementOrElements) return;
+    if (Array.isArray(elementOrElements)) {
+      const stripped = elementOrElements.map(({ id: _id, ...data }) => deepClone(data));
+      set({ clipboard: stripped });
+    } else {
+      const { id: _id, ...data } = elementOrElements;
+      set({ clipboard: [deepClone(data)] });
+    }
   },
 
+  /**
+   * Paste the clipboard contents.
+   * Always returns an array of new elements (each with a fresh id and +20px offset),
+   * or null if the clipboard is empty.
+   */
   paste() {
     const { clipboard } = get();
-    if (!clipboard) return null;
-    return {
+    if (!clipboard || clipboard.length === 0) return null;
+    return clipboard.map((data) => ({
       id: `elem_${nanoid(8)}`,
-      ...deepClone(clipboard),
+      ...deepClone(data),
       // Offset paste position so it's visible
-      x: (clipboard.x ?? 0) + 20,
-      y: (clipboard.y ?? 0) + 20,
-    };
+      x: (data.x ?? 0) + 20,
+      y: (data.y ?? 0) + 20,
+    }));
   },
 
   // ─── Style clipboard (Ctrl+Shift+C / Ctrl+Shift+V) ───────────────────────

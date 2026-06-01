@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
+import { useHistoryStore } from '../../store/historyStore';
 import { AVAILABLE_FONTS } from '../../constants/canvas';
 
 /**
@@ -29,6 +30,8 @@ function PropertyPanel() {
     clearSelection,
     alignElements,
   } = useCanvasStore();
+
+  const copy = useHistoryStore((s) => s.copy);
 
   const element = selectedElementId ? page.elements[selectedElementId] : null;
   const multiCount = selectedElementIds.length;
@@ -84,6 +87,18 @@ function PropertyPanel() {
             <button onClick={() => alignElements('distributeV')} className="px-1 py-1.5 rounded text-xs bg-white/10 hover:bg-white/20">⇕ Distribute V</button>
           </div>
         </Section>
+
+        <button
+          onClick={() => {
+            const els = selectedElementIds
+              .map((id) => ({ id, ...page.elements[id] }))
+              .filter((el) => el.type !== undefined);
+            if (els.length > 0) copy(els);
+          }}
+          className="px-3 py-2.5 rounded text-sm bg-white/10 hover:bg-white/20 transition-colors"
+        >
+          📋 Copy {multiCount} elements
+        </button>
 
         <button
           onClick={deleteSelectedElements}

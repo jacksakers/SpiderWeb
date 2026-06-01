@@ -29,6 +29,7 @@ export function useEditorShortcuts() {
     selectElements,
     clearSelection,
     addElement,
+    addElements,
     updateElement,
     undo,
     redo,
@@ -91,9 +92,17 @@ export function useEditorShortcuts() {
       }
 
       if (ctrl && e.key === 'c') {
-        if (!selectedElementId) return;
-        const el = page.elements[selectedElementId];
-        if (el) copy({ id: selectedElementId, ...el });
+        e.preventDefault();
+        if (selectedElementIds.length > 1) {
+          // Multi-select copy — grab all selected elements
+          const els = selectedElementIds
+            .map((id) => ({ id, ...page.elements[id] }))
+            .filter((el) => el.type !== undefined);
+          if (els.length > 0) copy(els);
+        } else if (selectedElementId) {
+          const el = page.elements[selectedElementId];
+          if (el) copy({ id: selectedElementId, ...el });
+        }
         return;
       }
 
@@ -114,8 +123,14 @@ export function useEditorShortcuts() {
 
       if (ctrl && e.key === 'v') {
         e.preventDefault();
-        const newEl = paste();
-        if (newEl) addElement(newEl);
+        const newEls = paste();
+        if (newEls) {
+          if (newEls.length === 1) {
+            addElement(newEls[0]);
+          } else if (newEls.length > 1) {
+            addElements(newEls);
+          }
+        }
         return;
       }
 
@@ -132,5 +147,5 @@ export function useEditorShortcuts() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isEditing, selectedElementId, selectedElementIds, page.elements, copy, paste, copyStyle, pasteStyle, addElement, updateElement, deleteElement, deleteSelectedElements, selectElements, clearSelection, undo, redo]);
+  }, [isEditing, selectedElementId, selectedElementIds, page.elements, copy, paste, copyStyle, pasteStyle, addElement, addElements, updateElement, deleteElement, deleteSelectedElements, selectElements, clearSelection, undo, redo]);
 }
