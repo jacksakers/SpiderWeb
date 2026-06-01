@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { db, isFirebaseConfigured } from '../../utils/firebase';
 import { useTabStore } from '../../store/tabStore';
 
 /**
@@ -11,6 +13,7 @@ function AddressBar() {
   const { getActiveTab, navigateTo, goBack, goForward } = useTabStore();
   const activeTab = getActiveTab();
   const [inputValue, setInputValue] = useState(activeTab?.pageId ?? '');
+  const [rolling, setRolling] = useState(false);
   const inputRef = useRef(null);
 
   // Sync input with the active tab's current pageId
@@ -27,6 +30,23 @@ function AddressBar() {
     if (e.key === 'Enter') handleNavigate();
     if (e.key === 'Escape') inputRef.current?.blur();
   }
+
+  const handleRandomPage = useCallback(async () => {
+    if (!isFirebaseConfigured() || !db || rolling) return;
+    setRolling(true);
+    try {
+      // Fetch up to 200 page IDs from Firestore and pick one at random.
+      const snap = await getDocs(query(collection(db, 'pages'), limit(200)));
+      if (snap.empty) return;
+      const ids = snap.docs.map((d) => d.id);
+      const randomId = ids[Math.floor(Math.random() * ids.length)];
+      navigateTo(randomId);
+    } catch (err) {
+      console.error('Random page fetch failed:', err);
+    } finally {
+      setRolling(false);
+    }
+  }, [rolling, navigateTo]);
 
   const canBack = activeTab && activeTab.historyIndex > 0;
   const canForward = activeTab && activeTab.historyIndex < activeTab.history.length - 1;
@@ -74,6 +94,18 @@ function AddressBar() {
       >
         Go
       </button>
+
+      {/* Random page discovery button — only shown when Firebase is configured */}
+      {isFirebaseConfigured() && (
+        <button
+          onClick={handleRandomPage}
+          disabled={rolling}
+          title="Random page"
+          className={`text-lg leading-none transition-opacity ${rolling ? 'opacity-40 cursor-wait' : 'opacity-60 hover:opacity-100'}`}
+        >
+          🎲
+        </button>
+      )}
     </div>
   );
 }
