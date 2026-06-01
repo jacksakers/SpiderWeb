@@ -175,7 +175,7 @@ function MetaBrowser() {
 
       {/* ── Browser chrome ──────────────────────────────────────────── */}
       <div className="flex items-stretch border-b border-white/10 shrink-0 min-w-0">
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0">
           <TabBar />
           <AddressBar />
         </div>

@@ -72,7 +72,7 @@ function AddressBar() {
       </button>
 
       {/* URL bar */}
-      <div className="flex flex-1 items-center bg-white/10 rounded px-3 py-1 gap-2">
+      <div className="flex flex-1 min-w-0 items-center bg-white/10 rounded px-3 py-1 gap-2">
         <span className="text-white/30 text-xs select-none">sw://</span>
         <input
           ref={inputRef}
