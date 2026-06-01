@@ -260,7 +260,7 @@ function EditorToolbar() {
           <ToolbarButton onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className="hidden sm:flex">↪ Redo</ToolbarButton>
 
           {/* Emoji picker */}
-          <div className="hidden sm:block">
+          {/* <div className="hidden sm:block">
             <ToolbarButton
               ref={emojiButtonRef}
               onClick={() => { setShowBackground(false); setShowEmoji((v) => !v); }}
@@ -274,7 +274,7 @@ function EditorToolbar() {
                 <EmojiPicker onInsert={handleEmojiInsert} onClose={() => setShowEmoji(false)} />
               </DropdownPortal>
             )}
-          </div>
+          </div> */}
 
           {/* Background panel */}
           <div className="hidden sm:block">
@@ -351,7 +351,6 @@ function AddMenuMobile({ onAddText, onAddImage, onAddShape, onAddButton, onAddLi
           onPointerDown={(e) => e.stopPropagation()}
         >
           {[
-            { label: 'T Text',      fn: onAddText },
             { label: 'T Text',      fn: onAddText },
             { label: '🖼 Image',    fn: onAddImage },
             { label: '▭ Rect',     fn: () => onAddShape('rectangle') },
