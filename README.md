@@ -1,4 +1,4 @@
-# SpiderWeb ??
+# SpiderWeb
 
 > A miniaturised, retro-styled creative internet � think Myspace/Geocities rebuilt as a zero-code drag-and-drop editor with a Meta-Browser that lets you navigate between user-built pages.
 
