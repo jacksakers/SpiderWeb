@@ -316,7 +316,7 @@ function PropertyPanel() {
             <input
               type="checkbox"
               checked={element.sticky ?? false}
-              onChange={(e) => update({ sticky: e.target.checked || undefined })}
+              onChange={(e) => update({ sticky: e.target.checked || false})}
               className="accent-yellow-500"
             />
             <span className="text-xs text-white/60">Fix to viewport (navigation bar)</span>
