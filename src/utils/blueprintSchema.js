@@ -19,7 +19,7 @@ const StyleSchema = z.object({
 // ─── Base fields shared by every element ────────────────────────────────────
 
 const BaseElementSchema = z.object({
-  type: z.enum(['text', 'image', 'shape', 'button', 'list', 'embed']),
+  type: z.enum(['text', 'image', 'shape', 'button', 'list', 'embed', 'group']),
   x: z.number(),
   y: z.number(),
   width: z.union([z.number(), z.literal('auto')]),
@@ -72,6 +72,22 @@ const EmbedElementSchema = BaseElementSchema.extend({
   embedType: z.enum(['youtube', 'spotify', 'soundcloud', 'generic']).optional(),
 });
 
+// ─── Group element (children are non-group elements only; no nested groups) ──
+
+const NonGroupElementSchema = z.discriminatedUnion('type', [
+  TextElementSchema,
+  ImageElementSchema,
+  ShapeElementSchema,
+  ButtonElementSchema,
+  ListElementSchema,
+  EmbedElementSchema,
+]);
+
+const GroupElementSchema = BaseElementSchema.extend({
+  type: z.literal('group'),
+  children: z.record(z.string(), NonGroupElementSchema),
+});
+
 // ─── Union ───────────────────────────────────────────────────────────────────
 
 const ElementSchema = z.discriminatedUnion('type', [
@@ -81,6 +97,7 @@ const ElementSchema = z.discriminatedUnion('type', [
   ButtonElementSchema,
   ListElementSchema,
   EmbedElementSchema,
+  GroupElementSchema,
 ]);
 
 // ─── Full page blueprint ─────────────────────────────────────────────────────

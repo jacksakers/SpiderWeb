@@ -10,6 +10,7 @@ import ShapeNode from '../elements/ShapeNode';
 import ButtonNode from '../elements/ButtonNode';
 import ListNode from '../elements/ListNode';
 import EmbedNode from '../elements/EmbedNode';
+import GroupNode from '../elements/GroupNode';
 
 /**
  * PageCanvas — the fixed-coordinate drawing surface.
@@ -173,6 +174,7 @@ function PageCanvas() {
     if (data.type === 'button') return <ButtonNode key={id} {...props} />;
     if (data.type === 'list')   return <ListNode   key={id} {...props} />;
     if (data.type === 'embed')  return <EmbedNode  key={id} {...props} />;
+    if (data.type === 'group')  return <GroupNode  key={id} {...props} />;
     return null;
   }
 

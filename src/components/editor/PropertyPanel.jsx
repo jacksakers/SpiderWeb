@@ -29,6 +29,8 @@ function PropertyPanel() {
     sendBackward,
     clearSelection,
     alignElements,
+    combineElements,
+    ungroupElements,
   } = useCanvasStore();
 
   const copy = useHistoryStore((s) => s.copy);
@@ -87,6 +89,14 @@ function PropertyPanel() {
             <button onClick={() => alignElements('distributeV')} className="px-1 py-1.5 rounded text-xs bg-white/10 hover:bg-white/20">⇕ Distribute V</button>
           </div>
         </Section>
+
+        <button
+          onClick={() => combineElements(selectedElementIds)}
+          className="px-3 py-2.5 rounded text-sm bg-purple-900/50 hover:bg-purple-700 text-purple-200 transition-colors"
+          title="Merge selected elements into a single group node"
+        >
+          🔗 Combine into group
+        </button>
 
         <button
           onClick={() => {
@@ -520,6 +530,32 @@ function PropertyPanel() {
               onChange={(e) => update({ target: e.target.checked ? '_blank' : undefined })}
             />
           </Row>
+        </Section>
+      )}
+
+      {/* Group-specific controls */}
+      {element.type === 'group' && (
+        <Section label="Group">
+          <Row label="Opacity">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={element.style?.opacity ?? 1}
+              onChange={(e) => updateStyle({ opacity: parseFloat(e.target.value) })}
+              className="w-full accent-purple-500"
+            />
+          </Row>
+          <p className="text-white/40 text-[10px] mt-1">
+            {Object.keys(element.children ?? {}).length} child element(s). Recolor, rotate, or scale the group as a whole. Ungroup to edit individual elements.
+          </p>
+          <button
+            onClick={() => ungroupElements(selectedElementId)}
+            className="px-3 py-2 rounded text-sm bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            ✂️ Ungroup
+          </button>
         </Section>
       )}
 

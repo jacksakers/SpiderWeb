@@ -173,6 +173,7 @@ B. Element Enhancements
 C. Editor Enhancements
   - Snap-to-Grid: Toggle aligns drag/resize to GRID_SIZE (16px) intervals using CSS grid overlay for visual feedback.
   - Alignment Tools: Multi-select elements, then align left/center/right/top/middle/bottom or distribute horizontally/vertically.
+  - Element Grouping: Multi-select any combination of non-group elements and click "Combine into group" in the multi-select panel. The selection is replaced by a single GroupNode whose children store positions relative to the group origin. The group can be moved, resized (children scale proportionally), rotated, and have group-level opacity applied. "Ungroup" in the Property Panel dissolves it back to individual top-level elements. Nested groups are not allowed.
   - Style Copy/Paste: Ctrl+Shift+C copies the selected element's style; Ctrl+Shift+V pastes it onto another element.
   - Ctrl+D: Duplicates the selected element with a +20px offset.
   - Emoji Picker: Toolbar dropdown with grouped emojis (Faces, Hearts, Stars, Music, Symbols). Clicking inserts a 48px text element.

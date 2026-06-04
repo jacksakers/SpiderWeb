@@ -29,16 +29,16 @@ SpiderWeb gives every user an **interactive canvas page** � a fixed-coordinate
 ```
 src/
 +-- components/
-�   +-- browser/          # Meta-Browser chrome (TabBar, AddressBar, MetaBrowser)
-�   +-- editor/           # Editor tools (EditorToolbar, PropertyPanel, PageCanvas)
-�   +-- elements/         # Canvas nodes (TextNode, ImageNode, ShapeNode)
+|   +-- browser/          # Meta-Browser chrome (TabBar, AddressBar, MetaBrowser)
+|   +-- editor/           # Editor tools (EditorToolbar, PropertyPanel, PageCanvas)
+|   +-- elements/         # Canvas nodes (TextNode, ImageNode, ShapeNode, GroupNode)
 +-- constants/
-�   +-- canvas.js         # MAX_CANVAS_WIDTH, font list, z-index limits, etc.
+|   +-- canvas.js         # MAX_CANVAS_WIDTH, font list, z-index limits, etc.
 +-- store/
-�   +-- canvasStore.js    # Active page blueprint + element CRUD (Zustand)
-�   +-- tabStore.js       # Meta-Browser tab system + navigation history (Zustand)
+|   +-- canvasStore.js    # Active page blueprint + element CRUD (Zustand)
+|   +-- tabStore.js       # Meta-Browser tab system + navigation history (Zustand)
 +-- utils/
-    +-- blueprintSchema.js  # Zod schema � validates pages before Firestore writes
+    +-- blueprintSchema.js  # Zod schema — validates pages before Firestore writes
     +-- canvasGeometry.js   # Scale factor + coordinate helpers
     +-- elementFactory.js   # Factory functions for Text / Image / Shape elements
     +-- firebase.js         # Firebase config + lazy-initialised singletons (Phase 2)
@@ -96,7 +96,8 @@ Click **Editing** in the toolbar to enter edit mode, then use the toolbar button
 
 ### Phase 3 � Polish & Figma Feel
 
-- [ ] Multi-element bounding-box selection (marquee drag)
+- [x] Multi-element bounding-box selection (marquee drag)
+- [x] **Element grouping — multi-select any combination of elements and click "Combine into group" to merge them into a single `GroupNode`. The group can be moved, resized (children scale proportionally), rotated, and have opacity changed as one unit. "Ungroup" in the Property Panel dissolves it back to individual elements.** *(new)*
 - [ ] Keyboard shortcuts: Delete, Ctrl+C, Ctrl+V, Ctrl+Z
 - [ ] Full undo/redo history stack
 - [ ] Page background image upload

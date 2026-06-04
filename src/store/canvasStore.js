@@ -245,10 +245,90 @@ export const useCanvasStore = create((set, get) => ({
     });
   },
 
+  /**
+   * Combine the given element IDs into a single group node.
+   * Children positions are stored relative to the group's top-left origin.
+   * Groups cannot be nested — any group in `ids` is silently skipped.
+   */
+  combineElements(ids) {
+    set((state) => {
+      const elements = state.page.elements;
+      // Skip groups so we don't create nested groups
+      const selected = ids.filter((id) => elements[id] && elements[id].type !== 'group');
+      if (selected.length < 2) return state;
+
+      const getW = (el) => (typeof el.width  === 'number' ? el.width  : 100);
+      const getH = (el) => (typeof el.height === 'number' ? el.height : 40);
+
+      const els = selected.map((id) => ({ id, ...elements[id] }));
+      const minX = Math.min(...els.map((e) => e.x));
+      const minY = Math.min(...els.map((e) => e.y));
+      const maxX = Math.max(...els.map((e) => e.x + getW(e)));
+      const maxY = Math.max(...els.map((e) => e.y + getH(e)));
+      const maxZ = Math.max(...els.map((e) => e.zIndex ?? 1));
+
+      // Store children with positions relative to the group origin
+      const children = {};
+      els.forEach(({ id, ...el }) => {
+        children[id] = { ...el, x: el.x - minX, y: el.y - minY };
+      });
+
+      const groupId = `group_${Date.now()}`;
+      const newElements = { ...elements };
+      selected.forEach((id) => { delete newElements[id]; });
+      newElements[groupId] = {
+        type: 'group',
+        x: minX,
+        y: minY,
+        width:  maxX - minX,
+        height: maxY - minY,
+        zIndex: maxZ,
+        rotation: 0,
+        children,
+      };
+
+      useHistoryStore.getState().commit(newElements);
+      return {
+        page: { ...state.page, elements: newElements },
+        selectedElementId:  groupId,
+        selectedElementIds: [groupId],
+      };
+    });
+  },
+
+  /**
+   * Dissolve a group back into its individual top-level elements.
+   * Children are repositioned to absolute canvas coordinates.
+   */
+  ungroupElements(id) {
+    set((state) => {
+      const group = state.page.elements[id];
+      if (!group || group.type !== 'group') return state;
+
+      const newElements = { ...state.page.elements };
+      delete newElements[id];
+
+      const restoredIds = [];
+      Object.entries(group.children ?? {}).forEach(([cid, child]) => {
+        newElements[cid] = {
+          ...child,
+          x: child.x + group.x,
+          y: child.y + group.y,
+          zIndex: child.zIndex ?? group.zIndex ?? 1,
+        };
+        restoredIds.push(cid);
+      });
+
+      useHistoryStore.getState().commit(newElements);
+      return {
+        page: { ...state.page, elements: newElements },
+        selectedElementIds: restoredIds,
+        selectedElementId:  restoredIds[restoredIds.length - 1] ?? null,
+      };
+    });
+  },
+
   bringForward(id) {
-    const el = get().page.elements[id];
-    if (!el) return;
-    get().updateElement(id, { zIndex: Math.min((el.zIndex ?? 1) + Z_INDEX_STEP, Z_INDEX_MAX) });
   },
 
   sendBackward(id) {
