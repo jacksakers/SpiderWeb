@@ -23,7 +23,7 @@ export async function uploadImage(file, pageId = 'local') {
   const path     = `pages/${pageId}/${filename}`;
   const storageRef = ref(storage, path);
 
-  await uploadBytes(storageRef, file);
+  await uploadBytes(storageRef, file, { contentType: file.type || 'image/jpeg' });
   const url = await getDownloadURL(storageRef);
   return url;
 }

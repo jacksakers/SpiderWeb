@@ -13,8 +13,8 @@ service firebase.storage {
     }
 
     function isUnderSizeLimit() {
-      // 5 MB maximum per upload
-      return request.resource.size < 5 * 1024 * 1024;
+      // 10 MB maximum per upload
+      return request.resource.size < 10 * 1024 * 1024;
     }
 
     // ─── Public read on all stored assets ─────────────────────────────────────
