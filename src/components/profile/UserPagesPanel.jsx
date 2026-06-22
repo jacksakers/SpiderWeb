@@ -56,7 +56,7 @@ function UserPagesPanel({ onClose, targetUserId = null }) {
           : query(col, where('editors', 'array-contains', effectiveUserId), orderBy('updatedAt', 'desc'));
       } else {
         // For others, only show public pages they own
-        q = query(col, where('ownerId', '==', effectiveUserId), where('isPublic', '==', true), orderBy('updatedAt', 'desc'));
+        q = query(col, where('ownerId', '==', effectiveUserId), orderBy('updatedAt', 'desc'));
       }
       const snap = await getDocs(q);
       setPages(snap.docs.map((d) => ({ pageId: d.id, ...d.data() })));
