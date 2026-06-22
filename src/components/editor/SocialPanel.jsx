@@ -7,20 +7,13 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { useAuthStore } from '../../store/authStore';
 import { useTabStore } from '../../store/tabStore';
 import { isFirebaseConfigured, db } from '../../utils/firebase';
+import UserPagesPanel from '../profile/UserPagesPanel';
 
 const MAX_COMMENT_LEN = 500;
 const MAX_LINK_LEN = 64;
 
 /**
  * SocialPanel — likes and comments for the currently viewed page.
- *
- * Firestore structure:
- *   pages/{pageId}/likes/{userId}   — presence doc (existence = liked)
- *   pages/{pageId}/comments/{id}    — { authorId, authorName, authorAvatar,
- *                                       content, pageLink, createdAt }
- *
- * Rules: anyone can read; signed-in users can create; authors + page owner
- * can delete comments; users can toggle their own like doc.
  */
 function SocialPanel() {
   const page    = useCanvasStore((s) => s.page);
@@ -36,10 +29,12 @@ function SocialPanel() {
   const [pageLink,    setPageLink]    = useState('');
   const [showLinkInput, setShowLinkInput] = useState(false);
 
+  const [ownerProfile, setOwnerProfile] = useState(null);
+  const [viewingUserId, setViewingUserId] = useState(null);
+
   const pageId  = page?.pageId;
   const ownerId = page?.ownerId;
 
-  // ─── Load likes + comments ─────────────────────────────────────────────────
   const load = useCallback(async () => {
     if (!isFirebaseConfigured() || !db || !pageId) {
       setLoading(false);
@@ -47,27 +42,27 @@ function SocialPanel() {
     }
     setLoading(true);
     try {
-      const [likesSnap, commentsSnap] = await Promise.all([
+      const [likesSnap, commentsSnap, ownerSnap] = await Promise.all([
         getDocs(collection(db, 'pages', pageId, 'likes')),
-        getDocs(query(
-          collection(db, 'pages', pageId, 'comments'),
-          orderBy('createdAt', 'asc'),
-        )),
+        getDocs(query(collection(db, 'pages', pageId, 'comments'), orderBy('createdAt', 'asc'))),
+        ownerId ? getDoc(doc(db, 'users', ownerId)) : Promise.resolve(null),
       ]);
 
       setLikeCount(likesSnap.size);
       setLiked(user ? likesSnap.docs.some((d) => d.id === user.uid) : false);
       setComments(commentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      if (ownerSnap?.exists()) {
+        setOwnerProfile(ownerSnap.data());
+      }
     } catch (err) {
       console.error('SocialPanel load error', err);
     } finally {
       setLoading(false);
     }
-  }, [pageId, user?.uid]);
+  }, [pageId, user?.uid, ownerId]);
 
   useEffect(() => { load(); }, [load]);
 
-  // ─── Like / unlike ─────────────────────────────────────────────────────────
   async function toggleLike() {
     if (!user || !db) return;
     const likeRef = doc(db, 'pages', pageId, 'likes', user.uid);
@@ -82,7 +77,6 @@ function SocialPanel() {
     }
   }
 
-  // ─── Post comment ──────────────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
     const trimmed = content.trim();
@@ -121,115 +115,95 @@ function SocialPanel() {
     }
   }
 
-  // ─── Delete comment ────────────────────────────────────────────────────────
   async function handleDeleteComment(commentId) {
     if (!db) return;
     await deleteDoc(doc(db, 'pages', pageId, 'comments', commentId));
     setComments((prev) => prev.filter((c) => c.id !== commentId));
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
   const firebaseReady = isFirebaseConfigured() && !!db;
-  const canDelete = (comment) =>
-    user && (user.uid === comment.authorId || user.uid === ownerId);
+  const canDelete = (comment) => user && (user.uid === comment.authorId || user.uid === ownerId);
 
-  function Avatar({ src, name }) {
+  function Avatar({ src, name, userId }) {
     const initial = name?.[0]?.toUpperCase() ?? '?';
-    if (src) {
-      return (
-        <img src={src} alt={name} className="w-7 h-7 rounded-full object-cover shrink-0" />
-      );
-    }
-    return (
+    const content = src ? (
+      <img src={src} alt={name} className="w-7 h-7 rounded-full object-cover shrink-0" />
+    ) : (
       <div className="w-7 h-7 rounded-full bg-purple-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
         {initial}
       </div>
     );
+    return userId ? (
+      <button onClick={() => setViewingUserId(userId)} className="hover:opacity-80 transition-opacity">
+        {content}
+      </button>
+    ) : content;
   }
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-  if (!firebaseReady) {
-    return (
-      <div className="p-4 text-white/30 text-xs text-center">
-        Social features require Firebase.
-      </div>
-    );
-  }
+  if (!firebaseReady) return <div className="p-4 text-white/30 text-xs text-center">Social features require Firebase.</div>;
 
   return (
     <div className="flex flex-col h-full text-sm text-white">
+      {/* Page Creator */}
+      {ownerProfile && (
+        <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+          <Avatar src={ownerProfile.photoURL} name={ownerProfile.displayName} userId={ownerId} />
+          <div className="flex-1 min-w-0">
+            <p className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">Created by</p>
+            <button
+              onClick={() => setViewingUserId(ownerId)}
+              className="text-white font-medium truncate hover:text-purple-400 transition-colors"
+            >
+              {ownerProfile.displayName}
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* ── Likes bar ────────────────────────────────────────────────── */}
+      {/* Likes bar */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
         <button
           onClick={toggleLike}
           disabled={!user}
-          title={user ? (liked ? 'Unlike' : 'Like this page') : 'Sign in to like'}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-            liked
-              ? 'bg-pink-600 text-white hover:bg-pink-500'
-              : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'
-          } disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${liked ? 'bg-pink-600 text-white hover:bg-pink-500' : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'}`}
         >
           {liked ? '❤️' : '🤍'} {likeCount}
         </button>
         {typeof page.visitCount === 'number' && (
-          <span className="text-white/30 text-xs flex items-center gap-1" title="Page visits">
-            👁 {page.visitCount.toLocaleString()}
-          </span>
-        )}
-        {!user && (
-          <span className="text-white/30 text-xs">Sign in to interact</span>
+          <span className="text-white/30 text-xs flex items-center gap-1">👁 {page.visitCount.toLocaleString()}</span>
         )}
       </div>
 
-      {/* ── Comments list ────────────────────────────────────────────── */}
+      {/* Comments list */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        {loading && (
-          <p className="text-white/30 text-xs text-center py-4">Loading…</p>
-        )}
-        {!loading && comments.length === 0 && (
-          <p className="text-white/20 text-xs text-center py-4">
-            No comments yet. Be the first!
-          </p>
-        )}
+        {loading && <p className="text-white/30 text-xs text-center py-4">Loading…</p>}
+        {!loading && comments.length === 0 && <p className="text-white/20 text-xs text-center py-4">No comments yet. Be the first!</p>}
         {comments.map((c) => (
           <div key={c.id} className="flex gap-2">
-            <Avatar src={c.authorAvatar} name={c.authorName} />
+            <Avatar src={c.authorAvatar} name={c.authorName} userId={c.authorId} />
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
-                <span className="text-white/80 text-xs font-medium truncate">{c.authorName}</span>
-                {c.createdAt && (
-                  <span className="text-white/20 text-[10px] shrink-0">
-                    {new Date(c.createdAt.seconds * 1000).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-              <p className="text-white/70 text-xs mt-0.5 break-words whitespace-pre-wrap">
-                {c.content}
-              </p>
-              {c.pageLink && (
                 <button
-                  onClick={() => navigateTo(c.pageLink)}
-                  className="mt-1 text-purple-400 hover:text-purple-300 text-xs underline break-all"
+                  onClick={() => setViewingUserId(c.authorId)}
+                  className="text-white/80 text-xs font-medium truncate hover:text-purple-400"
                 >
-                  🔗 sw://{c.pageLink}
+                  {c.authorName}
                 </button>
+                {c.createdAt && <span className="text-white/20 text-[10px] shrink-0">{new Date(c.createdAt.seconds * 1000).toLocaleDateString()}</span>}
+              </div>
+              <p className="text-white/70 text-xs mt-0.5 break-words whitespace-pre-wrap">{c.content}</p>
+              {c.pageLink && (
+                <button onClick={() => navigateTo(c.pageLink)} className="mt-1 text-purple-400 hover:text-purple-300 text-xs underline break-all">🔗 sw://{c.pageLink}</button>
               )}
               {canDelete(c) && (
-                <button
-                  onClick={() => handleDeleteComment(c.id)}
-                  className="mt-1 text-red-500/60 hover:text-red-400 text-[10px]"
-                >
-                  Delete
-                </button>
+                <button onClick={() => handleDeleteComment(c.id)} className="mt-1 text-red-500/60 hover:text-red-400 text-[10px]">Delete</button>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── Comment form ─────────────────────────────────────────────── */}
+      {/* Comment form */}
       {user ? (
         <form onSubmit={handleSubmit} className="border-t border-white/10 p-3 flex flex-col gap-2">
           <textarea
@@ -244,37 +218,29 @@ function SocialPanel() {
               type="text"
               value={pageLink}
               onChange={(e) => setPageLink(e.target.value.slice(0, MAX_LINK_LEN))}
-              placeholder="Page ID to link (optional)"
-              className="bg-white/10 rounded px-3 py-1.5 text-xs text-white placeholder:text-white/30 outline-none focus:ring-1 focus:ring-purple-500"
+              placeholder="Page ID to link"
+              className="bg-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:ring-1 focus:ring-purple-500"
             />
           )}
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowLinkInput((v) => !v)}
-              title="Attach a page link"
-              className={`text-xs px-2 py-1 rounded transition-colors ${
-                showLinkInput ? 'bg-purple-700 text-white' : 'bg-white/10 text-white/50 hover:bg-white/20'
-              }`}
+              className={`text-xs px-2 py-1 rounded transition-colors ${showLinkInput ? 'bg-purple-700 text-white' : 'bg-white/10 text-white/50 hover:bg-white/20'}`}
             >
               🔗 Link
             </button>
             <div className="flex-1" />
-            <span className="text-white/20 text-[10px]">{content.length}/{MAX_COMMENT_LEN}</span>
-            <button
-              type="submit"
-              disabled={submitting || !content.trim()}
-              className="px-3 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition-colors disabled:opacity-40"
-            >
+            <button type="submit" disabled={submitting || !content.trim()} className="px-3 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition-colors disabled:opacity-40">
               {submitting ? '…' : 'Post'}
             </button>
           </div>
         </form>
       ) : (
-        <div className="border-t border-white/10 p-3 text-white/30 text-xs text-center">
-          Sign in to comment
-        </div>
+        <div className="border-t border-white/10 p-3 text-white/30 text-xs text-center">Sign in to comment</div>
       )}
+
+      {viewingUserId && <UserPagesPanel targetUserId={viewingUserId} onClose={() => setViewingUserId(null)} />}
     </div>
   );
 }
